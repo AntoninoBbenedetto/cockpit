@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Activities\Tables;
 
+use App\Models\User;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Spatie\Activitylog\Models\Activity;
@@ -18,6 +19,7 @@ class ActivitiesTable
                     ->sortable(),
                 TextColumn::make('causer.name')
                     ->label('Autore')
+                    ->state(fn (Activity $record): ?string => self::causerLabel($record))
                     ->placeholder('Sistema'),
                 TextColumn::make('log_name')
                     ->label('Registro')
@@ -40,6 +42,17 @@ class ActivitiesTable
             ->defaultSort('created_at', 'desc')
             ->recordActions([])
             ->toolbarActions([]);
+    }
+
+    private static function causerLabel(Activity $record): ?string
+    {
+        $causer = $record->causer;
+
+        if ($causer instanceof User) {
+            return $causer->name;
+        }
+
+        return $record->causer_id ? "Utente eliminato #{$record->causer_id}" : null;
     }
 
     private static function changes(Activity $record): string

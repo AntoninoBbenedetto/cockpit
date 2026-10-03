@@ -45,3 +45,26 @@ it('lists entries readable by an audit viewer', function () {
         ->assertCanSeeTableRecords([$activity])
         ->assertSee('Operatore');
 });
+
+it('attributes entries of a deleted causer to the deleted user, not to the system', function () {
+    $this->actingAs(userWith(Permission::AuditView));
+    $causer = User::factory()->create(['name' => 'Ex Utente']);
+    $withCauser = activity('rbac')->causedBy($causer)->log('fatto da utente');
+    $withoutCauser = Activity::create(['description' => 'fatto dal sistema']);
+    $causerId = $causer->id;
+    $causer->delete();
+
+    \Pest\Livewire\livewire(ListActivities::class)
+        ->assertTableColumnStateSet('causer.name', "Utente eliminato #{$causerId}", $withCauser)
+        ->assertTableColumnStateSet('causer.name', null, $withoutCauser)
+        ->assertSee('Sistema');
+});
+
+it('shows the name of an existing causer', function () {
+    $this->actingAs(userWith(Permission::AuditView));
+    $causer = User::factory()->create(['name' => 'Mario Rossi']);
+    $entry = activity('rbac')->causedBy($causer)->log('fatto');
+
+    \Pest\Livewire\livewire(ListActivities::class)
+        ->assertTableColumnStateSet('causer.name', 'Mario Rossi', $entry);
+});
