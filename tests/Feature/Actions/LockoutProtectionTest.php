@@ -51,7 +51,7 @@ it('blocks deleting the role of the last manager', function () {
 it('blocks removing the role from the last manager', function () {
     [, $manager] = lastManagerSetup();
 
-    expect(fn () => app(SyncUserRoles::class)->handle($manager, []))
+    expect(fn () => app(SyncUserRoles::class)->handle($manager, $manager, []))
         ->toThrow(LockoutException::class);
 
     expect($manager->fresh()->hasRole('Gestori'))->toBeTrue();
@@ -123,7 +123,7 @@ it('allows removing the role from a manager when another manager remains', funct
     [, $manager] = lastManagerSetup();
     userWith(Permission::RolesManage);
 
-    app(SyncUserRoles::class)->handle($manager, []);
+    app(SyncUserRoles::class)->handle($manager, $manager, []);
 
     expect($manager->fresh()->hasRole('Gestori'))->toBeFalse();
 });

@@ -8,6 +8,7 @@ use App\Filament\Resources\Users\Pages\ListUsers;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Livewire\Livewire;
+use Spatie\Activitylog\Models\Activity;
 use Spatie\Permission\Models\Permission as PermissionModel;
 use Spatie\Permission\Models\Role;
 
@@ -189,7 +190,7 @@ it('assigns roles through the domain action', function () {
     Role::findOrCreate('Operatore', 'web');
     $target = User::factory()->create();
 
-    $this->actingAs(userWith(Permission::UsersView, Permission::UsersUpdate));
+    $this->actingAs(userWith(Permission::UsersView, Permission::UsersUpdate, Permission::RolesManage));
 
     livewire(EditUser::class, ['record' => $target->getKey()])
         ->fillForm(['role_names' => ['Operatore']])
@@ -224,7 +225,7 @@ it('keeps the password when left empty on edit and hashes a new one once', funct
 it('creates a user with roles and a password of at least 12 characters', function () {
     Role::findOrCreate('Operatore', 'web');
 
-    $this->actingAs(userWith(Permission::UsersView, Permission::UsersCreate));
+    $this->actingAs(userWith(Permission::UsersView, Permission::UsersCreate, Permission::RolesManage));
 
     livewire(CreateUser::class)
         ->fillForm(['name' => 'Mario', 'email' => 'mario@example.com', 'password' => 'corta'])
@@ -249,11 +250,13 @@ it('creates a user with roles and a password of at least 12 characters', functio
 
 it('shows a notification and keeps the roles when it would remove the last roles manager', function () {
     $role = Role::findOrCreate('Gestori', 'web');
-    $role->givePermissionTo(PermissionModel::findOrCreate(Permission::RolesManage->value, 'web'));
+    foreach ([Permission::RolesManage, Permission::UsersView, Permission::UsersUpdate] as $permission) {
+        $role->givePermissionTo(PermissionModel::findOrCreate($permission->value, 'web'));
+    }
     $manager = User::factory()->create();
     $manager->assignRole($role);
 
-    $this->actingAs(userWith(Permission::UsersView, Permission::UsersUpdate));
+    $this->actingAs($manager);
 
     livewire(EditUser::class, ['record' => $manager->getKey()])
         ->fillForm(['role_names' => []])
@@ -261,4 +264,77 @@ it('shows a notification and keeps the roles when it would remove the last roles
         ->assertNotified();
 
     expect($manager->fresh()->hasRole('Gestori'))->toBeTrue();
+});
+
+it('does not let an actor without roles.manage assign roles through a forged field', function (bool $ownPage) {
+    Role::findOrCreate('Amministratore', 'web');
+    $actor = userWith(Permission::UsersView, Permission::UsersUpdate);
+    $other = User::factory()->create();
+    $target = $ownPage ? $actor : $other;
+
+    $this->actingAs($actor);
+
+    livewire(EditUser::class, ['record' => $target->getKey()])
+        ->fillForm(['role_names' => ['Amministratore']])
+        ->call('save');
+
+    expect($target->fresh()->roles)->toHaveCount(0);
+})->with(['own edit page' => [true], 'another user' => [false]]);
+
+it('keeps the existing roles when an actor without roles.manage edits other fields', function () {
+    Role::findOrCreate('Operatore', 'web');
+    $target = User::factory()->create(['name' => 'Vecchio']);
+    $target->assignRole('Operatore');
+
+    $this->actingAs(userWith(Permission::UsersView, Permission::UsersUpdate));
+
+    livewire(EditUser::class, ['record' => $target->getKey()])
+        ->fillForm(['name' => 'Nuovo'])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($target->fresh()->name)->toBe('Nuovo')
+        ->and($target->fresh()->hasRole('Operatore'))->toBeTrue();
+});
+
+it('creates a user with no roles when the actor lacks roles.manage and forges the field', function () {
+    Role::findOrCreate('Amministratore', 'web');
+
+    $this->actingAs(userWith(Permission::UsersView, Permission::UsersCreate));
+
+    livewire(CreateUser::class)
+        ->fillForm([
+            'name' => 'Mario',
+            'email' => 'mario@example.com',
+            'password' => 'una-password-lunga-12',
+            'role_names' => ['Amministratore'],
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    expect(User::where('email', 'mario@example.com')->firstOrFail()->roles)->toHaveCount(0);
+});
+
+it('hides the role field from an actor without roles.manage', function () {
+    $target = User::factory()->create();
+
+    $this->actingAs(userWith(Permission::UsersView, Permission::UsersUpdate));
+
+    livewire(EditUser::class, ['record' => $target->getKey()])
+        ->assertFormFieldHidden('role_names');
+});
+
+it('writes no roles.synced audit entry when roles are unchanged', function () {
+    Role::findOrCreate('Operatore', 'web');
+    $target = User::factory()->create();
+    $target->assignRole('Operatore');
+
+    $this->actingAs(userWith(Permission::UsersView, Permission::UsersUpdate, Permission::RolesManage));
+
+    livewire(EditUser::class, ['record' => $target->getKey()])
+        ->fillForm(['name' => 'Altro nome'])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect(Activity::where('event', 'roles.synced')->count())->toBe(0);
 });

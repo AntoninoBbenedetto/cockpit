@@ -6,10 +6,23 @@ use App\Filament\Resources\Roles\Pages\EditRole;
 use App\Filament\Resources\Roles\Pages\ListRoles;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
+use Livewire\Livewire;
 use Spatie\Permission\Models\Permission as PermissionModel;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 use function Pest\Livewire\livewire;
+
+function rolesListSnapshot(): string
+{
+    $html = test()->get('/admin/roles')->assertSuccessful()->getContent();
+
+    preg_match_all('/wire:snapshot="([^"]+)"/', $html, $matches);
+
+    return collect($matches[1])
+        ->map(fn (string $raw) => html_entity_decode($raw, ENT_QUOTES))
+        ->first(fn (string $raw) => str_contains($raw, 'ListRoles'));
+}
 
 it('hides roles from a user without roles.manage', function () {
     $this->actingAs(userWith(Permission::UsersView))
@@ -101,14 +114,47 @@ it('shows a notification and keeps the role when deleting it would remove the la
     expect(Role::where('name', 'Gestori')->exists())->toBeTrue();
 });
 
-it('rejects roles pages and direct deletes without roles.manage', function () {
+it('rejects the roles pages without roles.manage', function () {
     $role = Role::findOrCreate('Operatore', 'web');
     $this->actingAs(userWith(Permission::UsersView, Permission::UsersDelete));
 
     livewire(ListRoles::class)->assertForbidden();
 
-    expect(Role::where('name', 'Operatore')->exists())->toBeTrue();
+    $this->get("/admin/roles/{$role->getKey()}/edit")->assertForbidden();
 });
+
+it('lets only an actor who still holds roles.manage delete a role through the Livewire endpoint', function (bool $revoked, bool $exists) {
+    $role = Role::findOrCreate('Operatore', 'web');
+    $actor = userWith(Permission::RolesManage);
+
+    $this->actingAs($actor);
+    $snapshot = rolesListSnapshot();
+
+    if ($revoked) {
+        $actor->revokePermissionTo(Permission::RolesManage->value);
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+    }
+
+    foreach ([
+        ['mountAction', ['delete', [], ['table' => true, 'recordKey' => (string) $role->getKey()]]],
+        ['callMountedAction', []],
+    ] as [$method, $params]) {
+        $response = $this->postJson(Livewire::getUpdateUri(), [
+            'components' => [[
+                'snapshot' => $snapshot,
+                'updates' => (object) [],
+                'calls' => [['path' => '', 'method' => $method, 'params' => $params]],
+            ]],
+        ], ['X-Livewire' => 'true']);
+
+        $snapshot = $response->json('components.0.snapshot') ?? $snapshot;
+    }
+
+    expect(Role::where('name', 'Operatore')->exists())->toBe($exists);
+})->with([
+    'control: permission kept' => [false, false],
+    'permission revoked after render' => [true, true],
+]);
 
 it('does not expose bulk delete', function () {
     $this->actingAs(userWith(Permission::RolesManage));

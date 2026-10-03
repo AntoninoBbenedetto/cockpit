@@ -8,6 +8,7 @@ use App\Actions\UpdateRolePermissions;
 use App\Enums\Permission;
 use App\Enums\UserStatus;
 use App\Models\User;
+use Illuminate\Auth\Access\AuthorizationException;
 use Spatie\Permission\Models\Role;
 
 it('suspends and reactivates a user', function () {
@@ -35,7 +36,7 @@ it('syncs the roles of a user', function () {
     Role::findOrCreate('Lettore', 'web');
     $target = User::factory()->create();
 
-    app(SyncUserRoles::class)->handle($target, ['Operatore', 'Lettore']);
+    app(SyncUserRoles::class)->handle(userWith(Permission::RolesManage), $target, ['Operatore', 'Lettore']);
 
     expect($target->fresh()->roles->pluck('name')->sort()->values()->all())
         ->toBe(['Lettore', 'Operatore']);
@@ -54,4 +55,15 @@ it('rejects permission names that are not in the enum', function () {
 
     expect(fn () => app(UpdateRolePermissions::class)->handle($role, ['users.fly']))
         ->toThrow(InvalidArgumentException::class);
+});
+
+it('refuses to sync roles for an actor without roles.manage and changes nothing', function () {
+    Role::findOrCreate('Operatore', 'web');
+    $actor = userWith(Permission::UsersUpdate);
+    $target = User::factory()->create();
+
+    expect(fn () => app(SyncUserRoles::class)->handle($actor, $target, ['Operatore']))
+        ->toThrow(AuthorizationException::class);
+
+    expect($target->fresh()->roles)->toHaveCount(0);
 });
