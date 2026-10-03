@@ -3,10 +3,10 @@
 namespace App\Filament\Resources\Roles\Schemas;
 
 use App\Enums\Permission;
+use App\Models\Role;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
-use Spatie\Permission\Models\Role;
 
 class RoleForm
 {

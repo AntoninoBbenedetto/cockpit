@@ -3,9 +3,9 @@
 namespace App\Actions;
 
 use App\Enums\Permission;
+use App\Models\Role;
 use InvalidArgumentException;
 use Spatie\Permission\Models\Permission as PermissionModel;
-use Spatie\Permission\Models\Role;
 
 class UpdateRolePermissions
 {
@@ -27,12 +27,16 @@ class UpdateRolePermissions
             array_values($permissionNames),
         );
 
-        LastRolesManagerGuard::protect(fn () => $role->syncPermissions($permissions));
+        // Modifica e voce di audit nella stessa transazione: o entrambe o nessuna.
+        LastRolesManagerGuard::protect(function () use ($role, $permissions, $permissionNames, $before) {
+            $role->syncPermissions($permissions);
 
-        activity('rbac')
-            ->performedOn($role)
-            ->event('permissions.synced')
-            ->withProperties(['old' => $before, 'attributes' => collect($permissionNames)->sort()->values()->all()])
-            ->log('Permessi del ruolo aggiornati');
+            activity('rbac')
+                ->causedBy(auth()->user())
+                ->performedOn($role)
+                ->event('permissions.synced')
+                ->withProperties(['old' => $before, 'attributes' => collect($permissionNames)->sort()->values()->all()])
+                ->log('Permessi del ruolo aggiornati');
+        });
     }
 }

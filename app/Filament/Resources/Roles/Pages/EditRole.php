@@ -5,10 +5,10 @@ namespace App\Filament\Resources\Roles\Pages;
 use App\Actions\UpdateRolePermissions;
 use App\Exceptions\LockoutException;
 use App\Filament\Resources\Roles\RoleResource;
+use App\Models\Role;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Database\Eloquent\Model;
-use Spatie\Permission\Models\Role;
 
 class EditRole extends EditRecord
 {

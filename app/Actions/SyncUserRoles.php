@@ -17,12 +17,16 @@ class SyncUserRoles
 
         $before = $target->roles()->pluck('name')->sort()->values()->all();
 
-        LastRolesManagerGuard::protect(fn () => $target->syncRoles($roleNames));
+        // Modifica e voce di audit nella stessa transazione: o entrambe o nessuna.
+        LastRolesManagerGuard::protect(function () use ($actor, $target, $roleNames, $before) {
+            $target->syncRoles($roleNames);
 
-        activity('rbac')
-            ->performedOn($target)
-            ->event('roles.synced')
-            ->withProperties(['old' => $before, 'attributes' => collect($roleNames)->sort()->values()->all()])
-            ->log('Ruoli utente aggiornati');
+            activity('rbac')
+                ->causedBy($actor)
+                ->performedOn($target)
+                ->event('roles.synced')
+                ->withProperties(['old' => $before, 'attributes' => collect($roleNames)->sort()->values()->all()])
+                ->log('Ruoli utente aggiornati');
+        });
     }
 }

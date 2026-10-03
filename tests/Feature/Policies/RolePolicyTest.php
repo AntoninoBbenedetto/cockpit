@@ -1,8 +1,8 @@
 <?php
 
 use App\Enums\Permission;
+use App\Models\Role;
 use App\Models\User;
-use Spatie\Permission\Models\Role;
 
 it('denies every role ability without roles.manage', function (string $ability) {
     $user = userWith(Permission::UsersView, Permission::UsersUpdate);

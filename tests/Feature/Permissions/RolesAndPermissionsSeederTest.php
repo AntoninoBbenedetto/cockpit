@@ -1,9 +1,9 @@
 <?php
 
 use App\Enums\Permission;
+use App\Models\Role;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Spatie\Permission\Models\Permission as PermissionModel;
-use Spatie\Permission\Models\Role;
 
 it('creates every permission defined in the enum', function () {
     $this->seed(RolesAndPermissionsSeeder::class);

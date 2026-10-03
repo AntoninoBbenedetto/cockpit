@@ -1,8 +1,8 @@
 <?php
 
 use App\Enums\Permission;
+use App\Models\Role;
 use App\Models\User;
-use Spatie\Permission\Models\Role;
 
 it('denies every user ability without the permission', function (string $ability) {
     $user = User::factory()->create();

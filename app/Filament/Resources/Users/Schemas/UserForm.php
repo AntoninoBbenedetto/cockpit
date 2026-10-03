@@ -3,11 +3,11 @@
 namespace App\Filament\Resources\Users\Schemas;
 
 use App\Enums\Permission;
+use App\Models\Role;
 use App\Models\User;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
-use Spatie\Permission\Models\Role;
 
 class UserForm
 {

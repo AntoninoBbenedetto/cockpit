@@ -4,13 +4,13 @@ namespace App\Filament\Resources\Roles\Tables;
 
 use App\Actions\DeleteRole;
 use App\Exceptions\LockoutException;
+use App\Models\Role;
 use DomainException;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Notifications\Notification;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Spatie\Permission\Models\Role;
 
 class RolesTable
 {

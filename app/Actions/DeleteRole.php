@@ -2,7 +2,7 @@
 
 namespace App\Actions;
 
-use Spatie\Permission\Models\Role;
+use App\Models\Role;
 
 class DeleteRole
 {
@@ -10,11 +10,15 @@ class DeleteRole
     {
         $name = $role->name;
 
-        LastRolesManagerGuard::protect(fn () => $role->delete());
+        // Eliminazione e voce di audit nella stessa transazione: o entrambe o nessuna.
+        LastRolesManagerGuard::protect(function () use ($role, $name) {
+            $role->delete();
 
-        activity('rbac')
-            ->event('role.deleted')
-            ->withProperties(['name' => $name])
-            ->log('Ruolo eliminato');
+            activity('rbac')
+                ->causedBy(auth()->user())
+                ->event('role.deleted')
+                ->withProperties(['name' => $name])
+                ->log('Ruolo eliminato');
+        });
     }
 }

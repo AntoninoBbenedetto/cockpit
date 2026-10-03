@@ -7,9 +7,9 @@ use App\Actions\SyncUserRoles;
 use App\Actions\UpdateRolePermissions;
 use App\Enums\Permission;
 use App\Enums\UserStatus;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
-use Spatie\Permission\Models\Role;
 
 it('suspends and reactivates a user', function () {
     $actor = userWith(Permission::UsersSuspend);

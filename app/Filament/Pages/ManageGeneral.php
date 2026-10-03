@@ -16,6 +16,9 @@ class ManageGeneral extends SettingsPage
 
     protected static string $settings = GeneralSettings::class;
 
+    /** @var array<string, mixed> */
+    protected array $settingsBefore = [];
+
     public static function canAccess(): bool
     {
         return auth()->user()?->can(Permission::SettingsGeneralUpdate->value) ?? false;
@@ -35,5 +38,22 @@ class ManageGeneral extends SettingsPage
                     ->email()
                     ->maxLength(255),
             ]);
+    }
+
+    protected function beforeSave(): void
+    {
+        $this->settingsBefore = app(GeneralSettings::class)->toArray();
+    }
+
+    protected function afterSave(): void
+    {
+        activity('settings')
+            ->causedBy(auth()->user())
+            ->event('settings.general.updated')
+            ->withProperties([
+                'old' => $this->settingsBefore,
+                'attributes' => app(GeneralSettings::class)->toArray(),
+            ])
+            ->log('Impostazioni generali aggiornate');
     }
 }
