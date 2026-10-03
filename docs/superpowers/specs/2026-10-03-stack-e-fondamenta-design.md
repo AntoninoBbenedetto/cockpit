@@ -1,7 +1,7 @@
 # Cockpit: stack e fondamenta — Design
 
 Data: 2026-10-03
-Stato: In revisione
+Stato: Approvata
 
 ## 1. Intento
 
