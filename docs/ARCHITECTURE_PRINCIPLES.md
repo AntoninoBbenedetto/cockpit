@@ -33,7 +33,8 @@ modello accettabile di default. L'accesso si decide per permesso, non per
 nome del ruolo.
 
 **Perché:** il controllo degli accessi non può essere un dettaglio lasciato
-allo scaffolding: va deciso esplicitamente per ogni risorsa. Vedi anche le
+allo scaffolding: va deciso esplicitamente per ogni risorsa. Vedi
+[ADR-002](adr/ADR-002-permessi-a-grana-fine-spatie-e-policy.md) e le
 definizioni di *Ruolo* e *Permesso* nel [glossario](glossary.md).
 
 **Trade-off accettato:** più configurazione di permessi da mantenere

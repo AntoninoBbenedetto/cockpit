@@ -201,10 +201,11 @@ Pest con il plugin Livewire, su PostgreSQL (`cockpit_test`) con
 
 ## 10. Documentazione collegata
 
-- **ADR-002:** permessi a grana fine con `spatie/laravel-permission` e
-  policy scritte a mano.
-- **ADR-003:** ambiente di sviluppo con Docker Compose scritto a mano
-  (PHP-FPM + Nginx).
+- **[ADR-002](../../adr/ADR-002-permessi-a-grana-fine-spatie-e-policy.md):**
+  permessi a grana fine con `spatie/laravel-permission` e policy scritte a
+  mano.
+- **[ADR-003](../../adr/ADR-003-ambiente-sviluppo-docker-compose.md):**
+  ambiente di sviluppo con Docker Compose scritto a mano (PHP-FPM + Nginx).
 - Le altre scelte di libreria restano in questa spec, senza un ADR ciascuna,
   perché sono reversibili con un normale PR.
 - `architecture/overview.md` si scrive dopo la prima installazione, quando
