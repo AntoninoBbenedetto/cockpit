@@ -30,20 +30,22 @@ function lastManagerSetup(): array
 }
 
 it('blocks removing roles.manage from the role of the last manager', function () {
-    [$role] = lastManagerSetup();
+    [$role, $manager] = lastManagerSetup();
 
     expect(fn () => app(UpdateRolePermissions::class)->handle($role, []))
         ->toThrow(LockoutException::class);
 
     expect($role->fresh()->hasPermissionTo(Permission::RolesManage->value))->toBeTrue();
+    expect($manager->fresh()->can(Permission::RolesManage->value))->toBeTrue();
 });
 
 it('blocks deleting the role of the last manager', function () {
-    [$role] = lastManagerSetup();
+    [$role, $manager] = lastManagerSetup();
 
     expect(fn () => app(DeleteRole::class)->handle($role))->toThrow(LockoutException::class);
 
     expect(Role::where('name', 'Gestori')->exists())->toBeTrue();
+    expect($manager->fresh()->can(Permission::RolesManage->value))->toBeTrue();
 });
 
 it('blocks removing the role from the last manager', function () {
@@ -53,6 +55,7 @@ it('blocks removing the role from the last manager', function () {
         ->toThrow(LockoutException::class);
 
     expect($manager->fresh()->hasRole('Gestori'))->toBeTrue();
+    expect($manager->fresh()->can(Permission::RolesManage->value))->toBeTrue();
 });
 
 it('blocks suspending the last manager', function () {
@@ -62,6 +65,7 @@ it('blocks suspending the last manager', function () {
         ->toThrow(LockoutException::class);
 
     expect($manager->fresh()->status)->toBe(UserStatus::Active);
+    expect($manager->fresh()->can(Permission::RolesManage->value))->toBeTrue();
 });
 
 it('blocks deleting the last manager', function () {
@@ -70,7 +74,9 @@ it('blocks deleting the last manager', function () {
     expect(fn () => app(DeleteUser::class)->handle($actor, $manager))
         ->toThrow(LockoutException::class);
 
-    expect(User::find($manager->id))->not->toBeNull();
+    // $manager->exists è false dopo il delete rolled back: si ricarica dal database.
+    expect(User::find($manager->id))->not->toBeNull()
+        ->and(User::find($manager->id)->can(Permission::RolesManage->value))->toBeTrue();
 });
 
 it('allows the same changes when another manager remains', function () {
@@ -90,4 +96,54 @@ it('does not count suspended users as managers', function () {
 
     expect(fn () => app(SuspendUser::class)->handle($actor, $manager))
         ->toThrow(LockoutException::class);
+
+    expect($manager->fresh()->status)->toBe(UserStatus::Active);
+});
+
+it('allows deleting the role when another manager remains', function () {
+    [$role] = lastManagerSetup();
+    $other = userWith(Permission::RolesManage);
+
+    app(DeleteRole::class)->handle($role);
+
+    expect(Role::where('name', 'Gestori')->exists())->toBeFalse()
+        ->and($other->fresh()->can(Permission::RolesManage->value))->toBeTrue();
+});
+
+it('allows updating the role permissions when another manager remains', function () {
+    [$role] = lastManagerSetup();
+    userWith(Permission::RolesManage);
+
+    app(UpdateRolePermissions::class)->handle($role, []);
+
+    expect($role->fresh()->permissions)->toHaveCount(0);
+});
+
+it('allows removing the role from a manager when another manager remains', function () {
+    [, $manager] = lastManagerSetup();
+    userWith(Permission::RolesManage);
+
+    app(SyncUserRoles::class)->handle($manager, []);
+
+    expect($manager->fresh()->hasRole('Gestori'))->toBeFalse();
+});
+
+it('allows deleting a manager user when another manager remains', function () {
+    [, $manager, $actor] = lastManagerSetup();
+    userWith(Permission::RolesManage);
+
+    app(DeleteUser::class)->handle($actor, $manager);
+
+    expect(User::find($manager->id))->toBeNull();
+});
+
+it('blocks suspending a last manager who holds roles.manage directly', function () {
+    $manager = userWith(Permission::RolesManage);
+    $actor = userWith(Permission::UsersSuspend);
+
+    expect(fn () => app(SuspendUser::class)->handle($actor, $manager))
+        ->toThrow(LockoutException::class);
+
+    expect($manager->fresh()->status)->toBe(UserStatus::Active)
+        ->and($manager->fresh()->can(Permission::RolesManage->value))->toBeTrue();
 });
