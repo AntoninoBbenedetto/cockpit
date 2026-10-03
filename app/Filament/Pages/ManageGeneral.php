@@ -9,6 +9,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Pages\SettingsPage;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Arr;
 
 class ManageGeneral extends SettingsPage
 {
@@ -42,7 +43,7 @@ class ManageGeneral extends SettingsPage
 
     protected function beforeSave(): void
     {
-        $this->settingsBefore = app(GeneralSettings::class)->toArray();
+        $this->settingsBefore = $this->auditedSettings();
     }
 
     protected function afterSave(): void
@@ -52,8 +53,18 @@ class ManageGeneral extends SettingsPage
             ->event('settings.general.updated')
             ->withProperties([
                 'old' => $this->settingsBefore,
-                'attributes' => app(GeneralSettings::class)->toArray(),
+                'attributes' => $this->auditedSettings(),
             ])
             ->log('Impostazioni generali aggiornate');
+    }
+
+    /**
+     * Elenco esplicito: un'impostazione futura con un segreto non finisce nel log per default.
+     *
+     * @return array<string, mixed>
+     */
+    private function auditedSettings(): array
+    {
+        return Arr::only(app(GeneralSettings::class)->toArray(), ['app_name', 'support_email']);
     }
 }

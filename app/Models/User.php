@@ -45,6 +45,19 @@ class User extends Authenticatable implements FilamentUser
         return $this->status === UserStatus::Active;
     }
 
+    protected static function booted(): void
+    {
+        // Evento senza valori: né password in chiaro né hash né la chiave nei dati.
+        static::updated(function (User $user) {
+            if ($user->wasChanged('password')) {
+                activity('user')
+                    ->performedOn($user)
+                    ->event('password.changed')
+                    ->log('Password modificata');
+            }
+        });
+    }
+
     public function getActivitylogOptions(): LogOptions
     {
         // Elenco esplicito: password e remember_token non devono mai comparire nel log.

@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 
 class CreateAdminUser extends Command
 {
@@ -24,12 +25,24 @@ class CreateAdminUser extends Command
 
         $this->call('db:seed', ['--class' => RolesAndPermissionsSeeder::class, '--force' => true]);
 
-        $user = User::create([
-            'name' => $this->option('name'),
-            'email' => $this->argument('email'),
-            'password' => $password,
-        ]);
-        $user->assignRole('Amministratore');
+        // Utente, ruolo e voce di audit nella stessa transazione. Nessun causer:
+        // da CLI non c'è un utente autenticato.
+        $user = DB::transaction(function () use ($password) {
+            $user = User::create([
+                'name' => $this->option('name'),
+                'email' => $this->argument('email'),
+                'password' => $password,
+            ]);
+            $user->assignRole('Amministratore');
+
+            activity('rbac')
+                ->performedOn($user)
+                ->event('roles.synced')
+                ->withProperties(['old' => [], 'attributes' => ['Amministratore']])
+                ->log('Ruoli utente aggiornati');
+
+            return $user;
+        });
 
         $this->info("Utente {$user->email} creato.");
 

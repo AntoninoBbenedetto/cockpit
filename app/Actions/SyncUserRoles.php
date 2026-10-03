@@ -21,11 +21,17 @@ class SyncUserRoles
         LastRolesManagerGuard::protect(function () use ($actor, $target, $roleNames, $before) {
             $target->syncRoles($roleNames);
 
+            $after = collect($roleNames)->sort()->values()->all();
+
+            if ($after === $before) {
+                return;
+            }
+
             activity('rbac')
                 ->causedBy($actor)
                 ->performedOn($target)
                 ->event('roles.synced')
-                ->withProperties(['old' => $before, 'attributes' => collect($roleNames)->sort()->values()->all()])
+                ->withProperties(['old' => $before, 'attributes' => $after])
                 ->log('Ruoli utente aggiornati');
         });
     }

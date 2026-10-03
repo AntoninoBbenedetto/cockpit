@@ -31,11 +31,17 @@ class UpdateRolePermissions
         LastRolesManagerGuard::protect(function () use ($role, $permissions, $permissionNames, $before) {
             $role->syncPermissions($permissions);
 
+            $after = collect($permissionNames)->sort()->values()->all();
+
+            if ($after === $before) {
+                return;
+            }
+
             activity('rbac')
                 ->causedBy(auth()->user())
                 ->performedOn($role)
                 ->event('permissions.synced')
-                ->withProperties(['old' => $before, 'attributes' => collect($permissionNames)->sort()->values()->all()])
+                ->withProperties(['old' => $before, 'attributes' => $after])
                 ->log('Permessi del ruolo aggiornati');
         });
     }

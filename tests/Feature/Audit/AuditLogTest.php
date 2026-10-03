@@ -44,14 +44,71 @@ it('logs user updates without the password or its hash', function () {
         ->and($json)->not->toContain('remember_token');
 });
 
-it('does not log a password-only change at all', function () {
+it('logs a password change as a value-less entry', function () {
+    $actor = userWith(Permission::UsersUpdate);
+    $this->actingAs($actor);
     $user = User::factory()->create();
     Activity::query()->delete();
 
     $user->update(['password' => 'another-secret-789']);
+
+    $entries = Activity::all();
+    $entry = $entries->first();
+
+    expect($entries)->toHaveCount(1)
+        ->and($entry->event)->toBe('password.changed')
+        ->and($entry->subject_id)->toBe($user->id)
+        ->and($entry->causer_id)->toBe($actor->id)
+        ->and($entry->attribute_changes)->toBeEmpty()
+        ->and($entry->properties)->toBeEmpty()
+        ->and($entries->toJson())->not->toContain('another-secret-789')
+        ->and($entries->toJson())->not->toContain($user->fresh()->password)
+        ->and($entries->toJson())->not->toContain('"password":');
+});
+
+it('does not log remember_token-only changes', function () {
+    $user = User::factory()->create();
+    Activity::query()->delete();
+
     $user->forceFill(['remember_token' => 'tok-abc-123'])->save();
 
     expect(Activity::count())->toBe(0);
+});
+
+it('writes no password.changed on a name-only update or on creation', function () {
+    $user = User::factory()->create(['password' => 'initial-secret-12345']);
+    $user->update(['name' => 'Altro Nome']);
+
+    expect(Activity::where('event', 'password.changed')->count())->toBe(0);
+});
+
+it('writes no roles.synced when the role set is unchanged', function () {
+    Role::findOrCreate('Operatore', 'web');
+    $actor = userWith(Permission::RolesManage);
+    $target = User::factory()->create();
+
+    app(SyncUserRoles::class)->handle($actor, $target, []);
+    expect(Activity::where('event', 'roles.synced')->count())->toBe(0);
+
+    app(SyncUserRoles::class)->handle($actor, $target, ['Operatore']);
+    app(SyncUserRoles::class)->handle($actor, $target, ['Operatore']);
+
+    $entries = Activity::where('event', 'roles.synced')->get();
+    expect($entries)->toHaveCount(1)
+        ->and($entries->first()->properties['old'])->toBe([])
+        ->and($entries->first()->properties['attributes'])->toBe(['Operatore']);
+});
+
+it('writes no permissions.synced when the permissions are unchanged', function () {
+    $role = Role::findOrCreate('Operatore', 'web');
+
+    app(UpdateRolePermissions::class)->handle($role, []);
+    expect(Activity::where('event', 'permissions.synced')->count())->toBe(0);
+
+    app(UpdateRolePermissions::class)->handle($role, [Permission::UsersView->value]);
+    app(UpdateRolePermissions::class)->handle($role, [Permission::UsersView->value]);
+
+    expect(Activity::where('event', 'permissions.synced')->count())->toBe(1);
 });
 
 it('logs status changes with old and new values', function () {
@@ -189,4 +246,17 @@ it('does not log a settings entry when validation fails', function () {
         ->assertHasFormErrors();
 
     expect(Activity::where('event', 'settings.general.updated')->count())->toBe(0);
+});
+
+it('records only the explicit settings keys', function () {
+    $this->actingAs(userWith(Permission::SettingsGeneralUpdate));
+
+    livewire(ManageGeneral::class)
+        ->fillForm(['app_name' => 'X', 'support_email' => 'a@example.test'])
+        ->call('save');
+
+    $activity = Activity::where('event', 'settings.general.updated')->firstOrFail();
+
+    expect(array_keys($activity->properties['attributes']))->toBe(['app_name', 'support_email'])
+        ->and(array_keys($activity->properties['old']))->toBe(['app_name', 'support_email']);
 });

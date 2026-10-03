@@ -338,3 +338,34 @@ it('writes no roles.synced audit entry when roles are unchanged', function () {
 
     expect(Activity::where('event', 'roles.synced')->count())->toBe(0);
 });
+
+it('writes exactly one password.changed entry when the edit form changes the password', function () {
+    $target = User::factory()->create();
+    $actor = userWith(Permission::UsersView, Permission::UsersUpdate);
+    $this->actingAs($actor);
+    Activity::query()->delete();
+
+    livewire(EditUser::class, ['record' => $target->getKey()])
+        ->fillForm(['password' => 'una-password-lunga-12'])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    $entries = Activity::where('event', 'password.changed')->get();
+
+    expect($entries)->toHaveCount(1)
+        ->and($entries->first()->subject_id)->toBe($target->id)
+        ->and($entries->first()->causer_id)->toBe($actor->id)
+        ->and(Activity::all()->toJson())->not->toContain('una-password-lunga-12');
+});
+
+it('writes no roles.synced when creating a user without roles', function () {
+    $this->actingAs(userWith(Permission::UsersView, Permission::UsersCreate, Permission::RolesManage));
+
+    livewire(CreateUser::class)
+        ->fillForm(['name' => 'Mario', 'email' => 'mario@example.com', 'password' => 'una-password-lunga-12'])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    expect(Activity::where('event', 'roles.synced')->count())->toBe(0)
+        ->and(Activity::where('event', 'password.changed')->count())->toBe(0);
+});
