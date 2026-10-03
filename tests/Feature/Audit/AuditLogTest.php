@@ -260,3 +260,15 @@ it('records only the explicit settings keys', function () {
     expect(array_keys($activity->properties['attributes']))->toBe(['app_name', 'support_email'])
         ->and(array_keys($activity->properties['old']))->toBe(['app_name', 'support_email']);
 });
+
+it('logs a role rename on the role log with old and new name', function () {
+    $role = Role::create(['name' => 'Operatore', 'guard_name' => 'web']);
+
+    $role->update(['name' => 'Supporto']);
+
+    $entry = Activity::where('log_name', 'role')->where('event', 'updated')->firstOrFail();
+
+    expect($entry->subject_id)->toBe($role->id)
+        ->and($entry->attribute_changes['attributes']['name'])->toBe('Supporto')
+        ->and($entry->attribute_changes['old']['name'])->toBe('Operatore');
+});

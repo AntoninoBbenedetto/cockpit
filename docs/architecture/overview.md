@@ -4,9 +4,12 @@ Come il sistema funziona oggi. Si aggiorna quando cambia l'architettura
 (nuovo modulo, nuovo confine, nuovo flusso principale), non a ogni commit —
 per i cambiamenti di dettaglio basta il codice stesso.
 
-Un solo pannello Filament (`admin`, su `/admin`). Le risorse Filament sono
-sottili: leggono e mostrano, ma ogni modifica passa da un'azione di dominio
-in `app/Actions`, che è l'unico punto che applica regole e scrive l'audit.
+Un solo pannello Filament (`admin`, su `/admin`). Le azioni di dominio in
+`app/Actions` contengono le regole per ruoli, permessi dei ruoli, stato ed
+eliminazione degli utenti. La creazione e la modifica degli utenti e la
+creazione e la rinomina dei ruoli passano invece dalle risorse Filament. Le
+voci di audit arrivano sia dalle azioni sia dagli eventi dei modelli
+(`User` e `Role` usano `LogsActivity`), e dalla pagina `ManageGeneral`.
 
 ## Moduli
 
@@ -27,18 +30,20 @@ in `app/Actions`, che è l'unico punto che applica regole e scrive l'audit.
 - **Azioni di dominio** (`app/Actions`): `SuspendUser`, `ReactivateUser`,
   `DeleteUser`, `SyncUserRoles(actor, target, ruoli)`,
   `UpdateRolePermissions`, `DeleteRole`, e `LastRolesManagerGuard`, la guardia
-  anti-lockout: in una transazione (con lock advisory PostgreSQL) impedisce
-  qualsiasi modifica che lasci il sistema senza utenti attivi con
-  `roles.manage`, e annulla la modifica con `LockoutException`.
+  anti-lockout: in una transazione (con lock advisory PostgreSQL) blocca solo
+  il passaggio da 1 a 0 degli utenti attivi con `roles.manage`, e annulla la
+  modifica con `LockoutException`. In più, non si può sospendere né eliminare
+  sé stessi (policy e azioni).
 - **Permessi** — enum `App\Enums\Permission` (`users.view`, `users.create`,
   `users.update`, `users.suspend`, `users.delete`, `roles.manage`,
   `settings.general.update`, `audit.view`), policy in `app/Policies`, seeder
   `RolesAndPermissionsSeeder` che crea i permessi e il ruolo `Amministratore`.
   Il codice verifica sempre permessi (`can()`), mai nomi di ruolo (vedi
   [ADR-002](../adr/ADR-002-permessi-a-grana-fine-spatie-e-policy.md)).
-- **Comando `cockpit:create-admin`** — crea il primo utente con il ruolo
-  `Amministratore`; utente, ruolo e voce di audit stanno in un'unica
-  transazione.
+- **Comando `cockpit:create-admin`** — crea un utente con il ruolo
+  `Amministratore` (si può rieseguire per aggiungerne altri). Valida prima
+  l'email (formato e unicità), poi esegue il seeder; utente, ruolo e voce di
+  audit stanno in un'unica transazione.
 
 ## Flussi principali
 
@@ -93,18 +98,25 @@ Ambiente: `make up` avvia i servizi `app` (PHP-FPM), `web` (Nginx), `db` e
 - **Assegnare ruoli richiede `roles.manage`.** Si riusa questo permesso
   invece di crearne uno dedicato; il controllo è applicato nell'azione
   `SyncUserRoles`, non solo nel form.
-- **LIMITE NOTO, decisione pendente con il responsabile del progetto:
-  `users.update` consente di cambiare email e password di QUALSIASI utente,
-  inclusi i titolari di `roles.manage`** (presa di controllo dell'account).
-  Di fatto `users.update` va trattato come un permesso amministrativo. Il
-  cambio password viene registrato nell'audit come `password.changed`, senza
-  alcun valore, quindi resta tracciabile.
+- **Nessun privilege-up su utenti.** `users.update`, `users.suspend` (anche
+  per riattivare) e `users.delete` valgono solo su un utente i cui permessi
+  (diretti e da ruoli) sono un sottoinsieme di quelli dell'actor, oppure se
+  l'actor ha `roles.manage`. Un utente non può quindi gestire (né cambiarne
+  email e password) chi ha permessi che lui non possiede. La pagina di
+  modifica ri-autorizza `update` anche al salvataggio. Il cambio password
+  resta registrato come `password.changed`, senza alcun valore.
 - **Retention dell'audit log non definita**: le voci non vengono mai
   cancellate né archiviate; la politica è fuori scopo per ora.
+- **Il seeder non tocca un `Amministratore` esistente**: assegna tutti i
+  permessi solo quando crea il ruolo; i permessi modificati dal pannello
+  restano come sono.
+- **`cockpit:create-admin` può aggiungere amministratori dalla CLI**; la voce
+  di audit ha causer nullo (nessun utente autenticato).
 - Altri limiti minori:
   - la modifica dell'utente non è atomica con la sincronizzazione dei ruoli
     (stesso discorso per la modifica del ruolo);
-  - rinominare un ruolo non produce una voce di audit dedicata;
+  - la rinomina di un ruolo è registrata dall'evento del modello `Role`
+    (registro `role`), non da una voce dedicata;
   - l'eliminazione di un ruolo è registrata due volte (evento del modello e
     voce `role.deleted`);
   - le modifiche ai permessi fatte dal seeder non sono registrate;

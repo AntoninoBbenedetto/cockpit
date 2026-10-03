@@ -52,6 +52,11 @@ Regole del modello:
   e si modificano dal pannello, protetti dal permesso `roles.manage`.
 - Protezioni anti-lockout: non si può sospendere né eliminare sé stessi, e
   non si può togliere `roles.manage` all'ultimo utente che lo possiede.
+- Assegnare ruoli agli utenti richiede `roles.manage`; il controllo è
+  applicato in `SyncUserRoles`, non solo nel form.
+- Nessun privilege-up: aggiornare, sospendere (e riattivare) o eliminare un
+  utente è consentito solo se i suoi permessi, diretti e da ruoli, sono un
+  sottoinsieme di quelli dell'actor, oppure se l'actor ha `roles.manage`.
 - Un solo guard, `web`.
 
 ## Consequences
@@ -74,6 +79,9 @@ Regole del modello:
   verificano che un permesso mancante neghi l'accesso.
 - Senza bypass, una policy dimenticata o sbagliata può bloccare anche chi
   dovrebbe avere accesso. L'anti-lockout copre solo `roles.manage`.
+- Un utente non può gestire chi ha permessi che lui non possiede, salvo che
+  abbia `roles.manage`: un ruolo delegato (per esempio di assistenza) non
+  equivale a un amministratore.
 - Dipendenza da `spatie/laravel-permission`, in una major recente (8.x): le
   istruzioni trovate online possono riferirsi a versioni precedenti.
 

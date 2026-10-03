@@ -12,7 +12,7 @@ generico di Laravel/Filament.
 | **Ruolo** | Etichetta assegnata a un utente che raggruppa un insieme di permessi. Non concede accesso da sola: lo concedono i permessi che contiene. |
 | **Permesso** | Singola autorizzazione a compiere un'azione su una risorsa (es. vedere o modificare gli utenti). È l'unità di controllo degli accessi: si verifica il permesso, non il nome del ruolo. Vedi [Architecture Principles](ARCHITECTURE_PRINCIPLES.md). |
 | **Impostazione** | Valore di configurazione a livello di applicazione, con tipo e regole di validazione esplicite. Non è un valore libero in `.env` o in una tabella senza vincoli. |
-| **Audit log** | Registro append-only delle modifiche a utenti, ruoli, permessi e impostazioni, con chi le ha fatte e i valori prima/dopo. Non contiene mai password né hash. Consultabile in sola lettura nel pannello (`/admin/activities`). |
+| **Audit log** | Registro delle modifiche a utenti, ruoli, permessi e impostazioni, con chi le ha fatte e i valori prima/dopo. Non contiene mai password né hash. Consultabile in sola lettura nel pannello (`/admin/activities`): dal pannello non si può modificare né cancellare. Non c'è una protezione a livello di database. |
 
 Regole:
 
