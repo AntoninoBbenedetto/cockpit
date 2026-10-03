@@ -2360,4 +2360,45 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 ## Note emerse
 
-*(Da compilare durante l'esecuzione.)*
+Differenze rispetto agli esempi del piano, emerse durante l'esecuzione, raggruppate per area.
+
+**spatie/laravel-permission 8.3**
+- Tag di pubblicazione: `permission-migrations` e `permission-config` (non `laravel-permission-*`).
+- `name` di Role/Permission accetta un `BackedEnum`; `givePermissionTo`, `syncRoles`, `findOrCreate`, `User::permission()` invariati.
+- `syncPermissions` con nomi stringa richiede che i permessi esistano: `UpdateRolePermissions` fa `findOrCreate` su ciascun nome (già validato contro l'enum) prima di sincronizzare.
+- Dopo una transazione annullata la cache del `PermissionRegistrar` resta sporca: `LastRolesManagerGuard` chiama `forgetCachedPermissions()` in caso di eccezione.
+
+**spatie/laravel-activitylog 5.1**
+- Namespace: `Spatie\Activitylog\Support\LogOptions` e trait `Spatie\Activitylog\Models\Concerns\LogsActivity`.
+- `dontSubmitEmptyLogs()` diventa `dontLogEmptyChanges()`.
+- I cambi automatici del modello (old/new) stanno nella colonna `attribute_changes`; `properties` contiene solo i dati di `withProperties()`. I cast enum sono registrati come valore (`suspended`). L'evento `deleted` ha solo `old`.
+- Tag di pubblicazione: `activitylog-migrations` e `activitylog-config`; la tabella è `activity_log`.
+- `activity()->performedOn()->event()->withProperties()->log()` e `causedBy()` invariati.
+
+**Filament 5.9**
+- Azioni di riga con `->recordActions([...])` e bulk con `->toolbarActions()` (non `actions()`); `Filament\Actions\Action`, `Filament\Schemas\Schema` per i form, componenti in `Filament\Forms\Components`.
+- `Action::authorize('ability')` nasconde l'azione e ne impedisce il mount.
+- Test: `TestAction::make('x')->table($record)`; `callAction` verifica prima la visibilità, quindi i test negativi usano `assertActionHidden` più `mountAction`/`callMountedAction`; il bulk delete si verifica con `getTable()->getBulkActions()`.
+- L'harness `livewire()` non esegue i middleware del pannello: il caso "sospeso dopo l'autenticazione" è testato via HTTP reale sull'URL `Livewire::getUpdateUri()` con header `X-Livewire` (route `default-livewire.update`).
+- `make:filament-resource` usa `--model-namespace=... --not-embedded --record-title-attribute=name`; `make:filament-settings-page` richiede il FQCN della classe settings e `--panel=admin`.
+- Il provider generato usa `PreventRequestForgery` (Laravel 13); `filament:install` aggiunge `filament:upgrade` a `post-autoload-dump` e voci a `.gitignore`.
+- Pagina impostazioni: base `Filament\Pages\SettingsPage`, hook `beforeValidate/afterValidate/beforeSave/afterSave`, salvataggio in transazione; l'istanza dei settings è cachata nel container (nei test usare `->refresh()`).
+
+**spatie/laravel-settings (plugin Filament)**
+- Il tag `settings` non esiste: si pubblicano `migrations` e `config`.
+
+**Pest 5 e test**
+- `phpunit/phpunit` rimosso da `require-dev` (arriva in modo transitivo con Pest 5).
+- Senza `FilamentUser` il risultato in ambiente di test è 403 per tutti, non 200 come nel RED atteso dal brief.
+
+**Docker / Composer**
+- `make` non era installato sull'host; il progetto compose omonimo di un vecchio stack andava rimosso. `composer install` da un clone pulito funziona senza `COMPOSER_HOME` dedicato.
+- Rimossi i file Node dello skeleton (`package.json`, vite, `CLAUDE.md`, `AGENTS.md`) e gli script npm di `composer.json`.
+
+**Deviazioni principali dal piano**
+- `status` non è assegnabile in massa (`#[Fillable]` = name, email, password): `SuspendUser`/`ReactivateUser` usano `forceFill()->save()`; i test usano le azioni o `forceFill`.
+- `SyncUserRoles::handle(User $actor, User $target, array $roleNames)`: l'actor è obbligatorio e deve avere `roles.manage`; il causer dell'audit è l'actor.
+- La voce `roles.synced`/`permissions.synced` è scritta dentro la transazione della guardia e saltata se l'insieme non cambia.
+- Sottoclasse `App\Models\Role` e `Amministratore` come unico ruolo del seeder.
+- Cambio password: voce `password.changed` priva di valori; audit delle impostazioni con elenco esplicito di chiavi.
+- `cockpit:create-admin`: utente, ruolo e voce di audit in una sola transazione.
