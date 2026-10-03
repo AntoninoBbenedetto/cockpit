@@ -7,7 +7,11 @@ generico di Laravel/Filament.
 
 | Termine | Definizione |
 |---|---|
-| *Termine di esempio* | *Definizione univoca, rimuovi questa riga quando aggiungi i termini reali (es. Utente, Ruolo, Permesso, Impostazione).* |
+| **Utente** | Persona con un account che può accedere al pannello di amministrazione. Ha uno stato e uno o più ruoli. |
+| **Stato utente** | Condizione dell'account: *attivo* (può accedere) o *sospeso* (account conservato ma accesso negato). Non è una cancellazione. |
+| **Ruolo** | Etichetta assegnata a un utente che raggruppa un insieme di permessi. Non concede accesso da sola: lo concedono i permessi che contiene. |
+| **Permesso** | Singola autorizzazione a compiere un'azione su una risorsa (es. vedere o modificare gli utenti). È l'unità di controllo degli accessi: si verifica il permesso, non il nome del ruolo. Vedi [Architecture Principles](ARCHITECTURE_PRINCIPLES.md). |
+| **Impostazione** | Valore di configurazione a livello di applicazione, con tipo e regole di validazione esplicite. Non è un valore libero in `.env` o in una tabella senza vincoli. |
 
 Regole:
 
