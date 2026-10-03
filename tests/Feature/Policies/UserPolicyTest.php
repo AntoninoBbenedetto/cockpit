@@ -56,3 +56,50 @@ it('does not grant access because of a role name', function () {
         ->and($user->can('update', $target))->toBeFalse()
         ->and($user->can('suspend', $target))->toBeFalse();
 });
+
+function helpdesk(): User
+{
+    return userWith(Permission::UsersView, Permission::UsersUpdate, Permission::UsersSuspend, Permission::UsersDelete);
+}
+
+it('denies a helpdesk actor every write on a target holding a permission the actor lacks', function (string $ability, Permission $extra) {
+    $target = userWith($extra);
+
+    expect(helpdesk()->can($ability, $target))->toBeFalse();
+})->with(['update', 'suspend', 'delete'])->with([Permission::RolesManage, Permission::AuditView]);
+
+it('denies a permission held only through a role', function () {
+    $role = Role::findOrCreate('Gestori', 'web');
+    $role->givePermissionTo(Spatie\Permission\Models\Permission::findOrCreate(Permission::RolesManage->value, 'web'));
+    $target = User::factory()->create();
+    $target->assignRole($role);
+
+    $actor = helpdesk();
+
+    expect($actor->can('update', $target))->toBeFalse()
+        ->and($actor->can('suspend', $target))->toBeFalse()
+        ->and($actor->can('delete', $target))->toBeFalse();
+});
+
+it('lets a helpdesk actor act on targets with no permissions, a peer or a subset', function (string $ability) {
+    $actor = helpdesk();
+    $none = User::factory()->create();
+    $peer = helpdesk();
+    $subset = userWith(Permission::UsersView, Permission::UsersSuspend);
+
+    expect($actor->can($ability, $none))->toBeTrue()
+        ->and($actor->can($ability, $peer))->toBeTrue()
+        ->and($actor->can($ability, $subset))->toBeTrue();
+})->with(['update', 'suspend', 'delete']);
+
+it('lets a roles.manage holder act on anyone, with the self rules still applying', function () {
+    $admin = userWith(...Permission::cases());
+    $target = userWith(...Permission::cases());
+
+    expect($admin->can('update', $target))->toBeTrue()
+        ->and($admin->can('suspend', $target))->toBeTrue()
+        ->and($admin->can('delete', $target))->toBeTrue()
+        ->and($admin->can('update', $admin))->toBeTrue()
+        ->and($admin->can('suspend', $admin))->toBeFalse()
+        ->and($admin->can('delete', $admin))->toBeFalse();
+});

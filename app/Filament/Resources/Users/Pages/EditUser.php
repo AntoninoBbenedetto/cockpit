@@ -10,6 +10,7 @@ use App\Models\User;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Gate;
 
 class EditUser extends EditRecord
 {
@@ -18,6 +19,7 @@ class EditUser extends EditRecord
     protected function handleRecordUpdate(Model $record, array $data): Model
     {
         /** @var User $record */
+        Gate::authorize('update', $record);
 
         /** @var User $actor */
         $actor = auth()->user();

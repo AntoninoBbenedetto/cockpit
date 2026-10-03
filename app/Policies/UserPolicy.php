@@ -24,21 +24,36 @@ class UserPolicy
 
     public function update(User $user, User $target): bool
     {
-        return $user->can(Permission::UsersUpdate->value);
+        return $user->can(Permission::UsersUpdate->value) && $this->outranks($user, $target);
     }
 
     public function suspend(User $user, User $target): bool
     {
-        return $user->can(Permission::UsersSuspend->value) && $user->isNot($target);
+        return $user->can(Permission::UsersSuspend->value) && $user->isNot($target) && $this->outranks($user, $target);
     }
 
     public function delete(User $user, User $target): bool
     {
-        return $user->can(Permission::UsersDelete->value) && $user->isNot($target);
+        return $user->can(Permission::UsersDelete->value) && $user->isNot($target) && $this->outranks($user, $target);
     }
 
     public function deleteAny(User $user): bool
     {
         return false;
+    }
+
+    /**
+     * Nessun privilege-up: chi non gestisce i ruoli (amministratore per
+     * design) può agire solo su chi ha permessi già in suo possesso.
+     */
+    private function outranks(User $actor, User $target): bool
+    {
+        if ($actor->can(Permission::RolesManage->value)) {
+            return true;
+        }
+
+        $held = $actor->getAllPermissions()->pluck('name');
+
+        return $target->getAllPermissions()->pluck('name')->diff($held)->isEmpty();
     }
 }

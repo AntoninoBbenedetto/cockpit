@@ -8,6 +8,7 @@ use App\Filament\Resources\Users\Pages\ListUsers;
 use App\Models\Role;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
+use Illuminate\Auth\Access\AuthorizationException;
 use Livewire\Livewire;
 use Spatie\Activitylog\Models\Activity;
 use Spatie\Permission\Models\Permission as PermissionModel;
@@ -368,4 +369,86 @@ it('writes no roles.synced when creating a user without roles', function () {
 
     expect(Activity::where('event', 'roles.synced')->count())->toBe(0)
         ->and(Activity::where('event', 'password.changed')->count())->toBe(0);
+});
+
+function helpdeskActor(): User
+{
+    return userWith(Permission::UsersView, Permission::UsersUpdate, Permission::UsersSuspend, Permission::UsersDelete);
+}
+
+it('forbids the edit page for a target holding permissions the actor lacks', function () {
+    $target = userWith(Permission::RolesManage);
+
+    $this->actingAs(helpdeskActor())
+        ->get("/admin/users/{$target->id}/edit")
+        ->assertForbidden();
+});
+
+it('ignores a forged save when the target gained permissions while the page was open', function () {
+    $target = User::factory()->create(['name' => 'Originale', 'email' => 'orig@example.test']);
+    $this->actingAs(helpdeskActor());
+
+    $html = $this->get("/admin/users/{$target->id}/edit")->assertSuccessful()->getContent();
+    preg_match_all('/wire:snapshot="([^"]+)"/', $html, $matches);
+    $snapshot = collect($matches[1])
+        ->map(fn (string $raw) => html_entity_decode($raw, ENT_QUOTES))
+        ->first(fn (string $raw) => str_contains($raw, 'EditUser'));
+
+    $target->givePermissionTo(PermissionModel::findOrCreate(Permission::RolesManage->value, 'web'));
+    $oldHash = $target->fresh()->password;
+
+    $this->postJson(Livewire::getUpdateUri(), [
+        'components' => [[
+            'snapshot' => $snapshot,
+            'updates' => ['data.name' => 'Hacked', 'data.email' => 'evil@example.test', 'data.password' => 'una-password-lunga-12'],
+            'calls' => [['path' => '', 'method' => 'save', 'params' => []]],
+        ]],
+    ], ['X-Livewire' => 'true'])->assertForbidden();
+
+    $fresh = $target->fresh();
+    expect($fresh->name)->toBe('Originale')
+        ->and($fresh->email)->toBe('orig@example.test')
+        ->and($fresh->password)->toBe($oldHash);
+});
+
+it('re-authorizes the update inside the save handler itself', function () {
+    $target = userWith(Permission::RolesManage);
+    $this->actingAs(helpdeskActor());
+
+    $page = new class extends EditUser
+    {
+        public function run(User $record): void
+        {
+            $this->handleRecordUpdate($record, ['name' => 'Hacked']);
+        }
+    };
+
+    expect(fn () => $page->run($target))->toThrow(AuthorizationException::class)
+        ->and($target->fresh()->name)->not->toBe('Hacked');
+});
+
+it('hides and denies suspend, reactivate and delete on a target the actor does not outrank', function () {
+    $active = userWith(Permission::AuditView);
+    $suspended = userWith(Permission::AuditView);
+    $suspended->forceFill(['status' => UserStatus::Suspended])->save();
+
+    $this->actingAs(helpdeskActor());
+
+    livewire(ListUsers::class)
+        ->assertActionHidden(TestAction::make('suspend')->table($active))
+        ->assertActionHidden(TestAction::make('delete')->table($active))
+        ->assertActionHidden(TestAction::make('reactivate')->table($suspended))
+        ->mountAction(TestAction::make('suspend')->table($active))
+        ->call('callMountedAction')
+        ->mountAction(TestAction::make('delete')->table($active))
+        ->call('callMountedAction')
+        ->mountAction(TestAction::make('delete')->table($suspended))
+        ->call('callMountedAction')
+        ->mountAction(TestAction::make('reactivate')->table($suspended))
+        ->call('callMountedAction');
+
+    expect($active->fresh()->status)->toBe(UserStatus::Active)
+        ->and($suspended->fresh()->status)->toBe(UserStatus::Suspended)
+        ->and(User::find($active->id))->not->toBeNull()
+        ->and(User::find($suspended->id))->not->toBeNull();
 });
