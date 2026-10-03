@@ -18,6 +18,10 @@ class RolesAndPermissionsSeeder extends Seeder
             ->map(fn (Permission $permission) => PermissionModel::findOrCreate($permission->value, 'web'));
 
         $role = Role::findOrCreate('Amministratore', 'web');
-        $role->syncPermissions($permissions);
+
+        // Un ruolo già esistente conserva i permessi assegnati dal pannello.
+        if ($role->wasRecentlyCreated) {
+            $role->syncPermissions($permissions);
+        }
     }
 }

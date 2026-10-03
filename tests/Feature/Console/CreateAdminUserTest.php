@@ -1,7 +1,9 @@
 <?php
 
 use App\Enums\Permission;
+use App\Models\Role;
 use App\Models\User;
+use Database\Seeders\RolesAndPermissionsSeeder;
 use Spatie\Activitylog\Models\Activity;
 
 it('creates the first administrator with every permission', function () {
@@ -53,4 +55,48 @@ it('leaves no user behind when the audit entry cannot be written', function () {
         ->run())->toThrow(RuntimeException::class);
 
     expect(User::where('email', 'admin@example.test')->exists())->toBeFalse();
+});
+
+it('does not restore permissions removed from an existing Amministratore role', function () {
+    $this->seed(RolesAndPermissionsSeeder::class);
+    $role = Role::findByName('Amministratore', 'web');
+    $role->revokePermissionTo(Permission::AuditView->value);
+
+    $this->artisan('cockpit:create-admin', ['email' => 'admin@example.test'])
+        ->expectsQuestion('Password', 'a-long-test-password')
+        ->assertSuccessful();
+
+    expect($role->fresh()->hasPermissionTo(Permission::AuditView->value))->toBeFalse()
+        ->and(User::where('email', 'admin@example.test')->exists())->toBeTrue();
+});
+
+it('fails cleanly on a duplicate or invalid email and leaves the role untouched', function (string $email) {
+    $this->seed(RolesAndPermissionsSeeder::class);
+    $role = Role::findByName('Amministratore', 'web');
+    $role->revokePermissionTo(Permission::AuditView->value);
+    User::factory()->create(['email' => 'taken@example.test']);
+    $users = User::count();
+    $activities = Activity::count();
+
+    $this->artisan('cockpit:create-admin', ['email' => $email])
+        ->expectsQuestion('Password', 'a-long-test-password')
+        ->assertFailed();
+
+    expect(User::count())->toBe($users)
+        ->and(Activity::count())->toBe($activities)
+        ->and($role->fresh()->hasPermissionTo(Permission::AuditView->value))->toBeFalse();
+})->with(['duplicate' => ['taken@example.test'], 'invalid' => ['not-an-email']]);
+
+it('does not seed anything when the email is rejected', function () {
+    $this->artisan('cockpit:create-admin', ['email' => 'not-an-email'])
+        ->expectsQuestion('Password', 'a-long-test-password')
+        ->assertFailed();
+
+    expect(Role::count())->toBe(0);
+});
+
+it('describes itself as creating an administrator, not the first one', function () {
+    $command = Artisan::all()['cockpit:create-admin'];
+
+    expect($command->getDescription())->not->toContain('primo');
 });
