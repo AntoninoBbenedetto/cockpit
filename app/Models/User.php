@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Enums\Permission;
 use App\Enums\UserStatus;
 use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
@@ -43,6 +44,14 @@ class User extends Authenticatable implements FilamentUser
     public function canAccessPanel(Panel $panel): bool
     {
         return $this->status === UserStatus::Active;
+    }
+
+    /** Solo i permessi dati tramite ruolo contano: quelli diretti sono un limite noto. */
+    public function hasPrivilegedRole(): bool
+    {
+        return $this->roles()
+            ->whereHas('permissions', fn ($query) => $query->whereIn('name', Permission::privilegedValues()))
+            ->exists();
     }
 
     protected static function booted(): void
