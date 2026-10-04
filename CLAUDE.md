@@ -47,6 +47,7 @@ make lint      # pint --test + phpstan (non scrive)
 ## Test
 
 - Pest 5 + plugin Livewire: nei test Filament usare `livewire(...)`. Helper globale `userWith(Permission ...$permissions)` in `tests/Pest.php`. `RefreshDatabase` su tutta `tests/Feature`.
+- `tests/Arch`: regole architetturali (Pest arch + scansione sorgenti + cablaggio policy/permessi), girano con `make test`. Una nuova regola da non violare va codificata lì.
 - I test girano solo nel container (PostgreSQL host `db`, database `cockpit_test`). Il DB di test lo crea `docker/postgres/init-test-db.sh` solo alla prima inizializzazione del volume `db-data`: se manca va creato a mano.
 
 ## Convenzioni

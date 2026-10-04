@@ -10,6 +10,8 @@ pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
     ->in('Feature');
 
+pest()->extend(TestCase::class)->in('Arch');
+
 function userWith(Permission ...$permissions): User
 {
     $user = User::factory()->create();
