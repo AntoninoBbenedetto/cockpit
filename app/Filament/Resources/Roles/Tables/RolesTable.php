@@ -12,6 +12,7 @@ use Filament\Actions\EditAction;
 use Filament\Notifications\Notification;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Auth\Access\AuthorizationException;
 
 class RolesTable
 {
@@ -41,7 +42,7 @@ class RolesTable
 
                         try {
                             app(DeleteRole::class)->handle($actor, $record);
-                        } catch (DomainException|LockoutException $e) {
+                        } catch (AuthorizationException|DomainException|LockoutException $e) {
                             Notification::make()->danger()->title($e->getMessage())->send();
 
                             return;

@@ -9,6 +9,7 @@ use App\Filament\Resources\Users\UserResource;
 use App\Models\User;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Gate;
 
@@ -31,7 +32,7 @@ class EditUser extends EditRecord
             if ($requested !== $current) {
                 try {
                     app(SyncUserRoles::class)->handle($actor, $record, $requested);
-                } catch (LockoutException $e) {
+                } catch (AuthorizationException|LockoutException $e) {
                     Notification::make()->danger()->title($e->getMessage())->send();
                     $this->halt();
                 }
