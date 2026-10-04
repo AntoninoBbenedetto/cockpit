@@ -16,7 +16,8 @@ final class LastRolesManagerGuard
 {
     /**
      * Esegue la modifica in transazione. Se prima c'era almeno un utente
-     * attivo con roles.manage e dopo non ce n'è nessuno, annulla tutto.
+     * attivo con roles.manage (o con admin.assign) e dopo non ce n'è nessuno,
+     * annulla tutto. I due conteggi sono indipendenti.
      */
     public static function protect(Closure $change): mixed
     {
@@ -26,11 +27,16 @@ final class LastRolesManagerGuard
                 // potrebbero entrambe vedere "un altro gestore resta" e rimuoverli entrambi.
                 DB::select('select pg_advisory_xact_lock(?)', [crc32('cockpit.roles-manage-guard')]);
 
-                $before = self::managers();
+                $managersBefore = self::holders(Permission::RolesManage);
+                $assignersBefore = self::holders(Permission::AdminAssign);
                 $result = $change();
 
-                if ($before > 0 && self::managers() === 0) {
+                if ($managersBefore > 0 && self::holders(Permission::RolesManage) === 0) {
                     throw LockoutException::lastRolesManager();
+                }
+
+                if ($assignersBefore > 0 && self::holders(Permission::AdminAssign) === 0) {
+                    throw LockoutException::lastAdminAssigner();
                 }
 
                 return $result;
@@ -44,13 +50,13 @@ final class LastRolesManagerGuard
         }
     }
 
-    private static function managers(): int
+    private static function holders(Permission $permission): int
     {
-        PermissionModel::findOrCreate(Permission::RolesManage->value, 'web');
+        PermissionModel::findOrCreate($permission->value, 'web');
 
         return User::query()
             ->where('status', UserStatus::Active->value)
-            ->permission(Permission::RolesManage->value)
+            ->permission($permission->value)
             ->count();
     }
 }

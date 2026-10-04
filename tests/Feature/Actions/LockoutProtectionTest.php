@@ -122,7 +122,8 @@ it('allows updating the role permissions when another manager remains', function
 
 it('allows removing the role from a manager when another manager remains', function () {
     [, $manager] = lastManagerSetup();
-    userWith(Permission::RolesManage);
+    // Il setup rende il gestore anche titolare di admin.assign: l'altro gestore deve avere entrambi.
+    userWith(Permission::RolesManage, Permission::AdminAssign);
 
     app(SyncUserRoles::class)->handle($manager, $manager, []);
 
@@ -131,7 +132,8 @@ it('allows removing the role from a manager when another manager remains', funct
 
 it('allows deleting a manager user when another manager remains', function () {
     [, $manager, $actor] = lastManagerSetup();
-    userWith(Permission::RolesManage);
+    // Il setup rende il gestore anche titolare di admin.assign: l'altro gestore deve avere entrambi.
+    userWith(Permission::RolesManage, Permission::AdminAssign);
 
     app(DeleteUser::class)->handle($actor, $manager);
 

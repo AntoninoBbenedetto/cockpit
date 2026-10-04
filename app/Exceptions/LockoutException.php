@@ -10,4 +10,9 @@ class LockoutException extends DomainException
     {
         return new self('Operazione non consentita: non resterebbe nessun utente attivo con il permesso roles.manage.');
     }
+
+    public static function lastAdminAssigner(): self
+    {
+        return new self('Operazione non consentita: non resterebbe nessun utente attivo con il permesso admin.assign.');
+    }
 }
