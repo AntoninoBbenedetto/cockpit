@@ -43,13 +43,18 @@ class UserPolicy
     }
 
     /**
-     * Nessun privilege-up: chi non gestisce i ruoli (amministratore per
-     * design) può agire solo su chi ha permessi già in suo possesso.
+     * Nessun privilege-up: admin.assign (amministrazione completa) agisce su
+     * chiunque; chi non lo ha non tocca mai un utente con un ruolo privilegiato
+     * e, per gli altri, solo chi ha permessi già in suo possesso (ADR-004).
      */
     private function outranks(User $actor, User $target): bool
     {
-        if ($actor->can(Permission::RolesManage->value)) {
+        if ($actor->can(Permission::AdminAssign->value)) {
             return true;
+        }
+
+        if ($target->hasPrivilegedRole()) {
+            return false;
         }
 
         $held = $actor->getAllPermissions()->pluck('name');
