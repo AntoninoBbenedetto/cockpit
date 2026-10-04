@@ -36,7 +36,9 @@ Chi gestisce utenti e ruoli ma non è "l'amministratore" non deve poter assegnar
 | `SyncUserRoles` | il diff (ruoli aggiunti o rimossi) contiene un ruolo privilegiato. Cambiare solo ruoli ordinari resta con `roles.manage`. |
 | `UpdateRolePermissions` | il ruolo è già privilegiato, oppure il diff aggiunge o toglie `roles.manage` o `admin.assign`. |
 | `DeleteRole` | il ruolo è privilegiato. |
-| `UserPolicy::outranks` | il target è un utente privilegiato. La scorciatoia `roles.manage` diventa `admin.assign`; resta la regola del sottoinsieme di permessi. |
+| `UserPolicy::outranks` | il target è un utente privilegiato. La scorciatoia `roles.manage` diventa `admin.assign`; resta la regola del sottoinsieme di permessi. Su sé stessi la modifica è sempre ammessa (i ruoli passano da `SyncUserRoles`; sospensione ed eliminazione di sé stessi restano vietate a parte). |
+
+`LastRolesManagerGuard::protect` protegge anche `admin.assign`: oltre al passaggio da 1 a 0 utenti attivi con `roles.manage`, blocca (con `LockoutException::lastAdminAssigner()`) il passaggio da 1 a 0 utenti attivi con `admin.assign`. I due conteggi sono indipendenti e non scatta nulla se nessuno ha `admin.assign`.
 
 In caso di violazione: `AuthorizationException` con messaggio in italiano, nessuna modifica, nessuna voce di audit.
 
@@ -48,7 +50,7 @@ Anche la creazione di un ruolo con permessi privilegiati passa dallo stesso cont
 
 ## Installazioni esistenti
 
-- Migrazione dati `grant_admin_assign_to_roles_managers`: `findOrCreate` del permesso `admin.assign` (guard `web`) e assegnazione a ogni ruolo che ha già `roles.manage`. Idempotente. `down()` rimuove solo il permesso.
+- Migrazione dati `grant_admin_assign_to_roles_managers`: `findOrCreate` del permesso `admin.assign` (guard `web`) e assegnazione a ogni ruolo che ha già `roles.manage` (se `roles.manage` non esiste, come in un'installazione nuova, la migrazione esce subito: ci pensa il seeder). Idempotente. `down()` rimuove solo il permesso.
 - Nessuna voce di audit (riallineamento di sistema); va aggiunto ai limiti noti, come le modifiche del seeder.
 - Il seeder continua ad assegnare tutti i permessi ad `Amministratore` solo alla creazione del ruolo, quindi anche `admin.assign` sulle installazioni nuove. Non riallinea se il ruolo esiste.
 - Dopo la migrazione nulla cambia per gli admin attuali: la restrizione scatta solo per i ruoli futuri con `roles.manage` senza `admin.assign`.

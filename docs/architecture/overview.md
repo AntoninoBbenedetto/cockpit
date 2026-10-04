@@ -31,11 +31,13 @@ voci di audit arrivano sia dalle azioni sia dagli eventi dei modelli
   eliminazione dal pannello.
 - **Azioni di dominio** (`app/Actions`): `SuspendUser`, `ReactivateUser`,
   `DeleteUser`, `SyncUserRoles(actor, target, ruoli)`,
-  `UpdateRolePermissions`, `DeleteRole` (tutte con l'actor come primo
-  argomento), `PrivilegedAccessGuard` (regola `admin.assign`, vedi sotto), e
+  `UpdateRolePermissions`, `DeleteRole` (prendono `User $actor` come primo
+  argomento solo `SyncUserRoles`, `UpdateRolePermissions`, `DeleteRole`,
+  `SuspendUser` e `DeleteUser`), `PrivilegedAccessGuard` (regola `admin.assign`, vedi sotto), e
   `LastRolesManagerGuard`, la guardia
   anti-lockout: in una transazione (con lock advisory PostgreSQL) blocca solo
-  il passaggio da 1 a 0 degli utenti attivi con `roles.manage`, e annulla la
+  il passaggio da 1 a 0 degli utenti attivi con `roles.manage` e, con un
+  conteggio separato, di quelli con `admin.assign`, e annulla la
   modifica con `LockoutException`. In più, non si può sospendere né eliminare
   sé stessi (policy e azioni).
 - **Permessi** — enum `App\Enums\Permission` (`users.view`, `users.create`,
@@ -103,7 +105,8 @@ Ambiente: `make up` avvia i servizi `app` (PHP-FPM), `web` (Nginx), `db` e
   ha anche `admin.assign`; l'amministrazione completa è la coppia
   `roles.manage` + `admin.assign`. Chi ha `roles.manage` può comunque
   assegnare qualsiasi permesso non privilegiato a un ruolo ordinario.
-  `roles.manage` resta protetto dalla guardia anti-lockout.
+  `roles.manage` e `admin.assign` restano protetti dalla guardia anti-lockout,
+  ciascuno con il proprio conteggio di utenti attivi.
 - **La regola è nelle Action, non nei form.** `PrivilegedAccessGuard` è
   chiamata da `SyncUserRoles`, `UpdateRolePermissions` e `DeleteRole` dentro
   `LastRolesManagerGuard::protect`; il rifiuto è una `AuthorizationException`

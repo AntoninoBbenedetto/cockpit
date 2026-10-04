@@ -60,6 +60,17 @@ Alternative scartate:
 **Negative / accepted trade-offs:**
 - `admin.assign` da solo non gestisce i ruoli: serve anche `roles.manage`.
   L'amministrazione completa è la coppia dei due permessi.
+- `admin.assign` insieme a `users.update` (senza `roles.manage`) equivale di
+  fatto ad amministrazione completa: può reimpostare la password di un
+  amministratore. Va quindi concesso con questa consapevolezza; un ruolo del
+  genere può crearlo solo chi ha `admin.assign`.
+- L'ultimo titolare attivo di `admin.assign` non si può rimuovere: la guardia
+  anti-lockout protegge entrambi i livelli (`roles.manage` e `admin.assign`),
+  ciascuno con il proprio conteggio, altrimenti i ruoli privilegiati
+  resterebbero intoccabili senza intervento sul database.
+- Un utente può sempre modificare sé stesso (`outranks`), anche con un ruolo
+  privilegiato e senza `admin.assign`: i ruoli passano comunque dalle Action,
+  e sospendere o eliminare sé stessi resta vietato.
 - La migrazione dati non scrive voci di audit.
 - I permessi assegnati direttamente all'utente non sono coperti: non
   rendono privilegiato un utente (limite noto già dichiarato).
