@@ -92,7 +92,7 @@ it('lets a helpdesk actor act on targets with no permissions, a peer or a subset
         ->and($actor->can($ability, $subset))->toBeTrue();
 })->with(['update', 'suspend', 'delete']);
 
-it('lets a roles.manage holder act on anyone, with the self rules still applying', function () {
+it('lets an admin.assign holder act on anyone, with the self rules still applying', function () {
     $admin = userWith(...Permission::cases());
     $target = userWith(...Permission::cases());
 
@@ -102,4 +102,45 @@ it('lets a roles.manage holder act on anyone, with the self rules still applying
         ->and($admin->can('update', $admin))->toBeTrue()
         ->and($admin->can('suspend', $admin))->toBeFalse()
         ->and($admin->can('delete', $admin))->toBeFalse();
+});
+
+it('denies a roles.manage holder without admin.assign every write on a user holding a privileged role', function (string $ability) {
+    $target = User::factory()->create();
+    $target->assignRole(privilegedRole());
+    $actor = userWith(Permission::UsersView, Permission::UsersUpdate, Permission::UsersSuspend, Permission::UsersDelete, Permission::RolesManage);
+
+    expect($actor->can($ability, $target))->toBeFalse();
+})->with(['update', 'suspend', 'delete']);
+
+it('lets an admin.assign holder act on a user holding a privileged role', function (string $ability) {
+    $target = User::factory()->create();
+    $target->assignRole(privilegedRole());
+    $actor = userWith(Permission::UsersUpdate, Permission::UsersSuspend, Permission::UsersDelete, Permission::AdminAssign);
+
+    expect($actor->can($ability, $target))->toBeTrue();
+})->with(['update', 'suspend', 'delete']);
+
+it('no longer lets roles.manage alone bypass the permission subset rule', function () {
+    $actor = userWith(Permission::UsersUpdate, Permission::RolesManage);
+    $target = userWith(Permission::AuditView);
+
+    expect($actor->can('update', $target))->toBeFalse();
+});
+
+it('lets a privileged user without admin.assign update themselves but not suspend or delete themselves', function () {
+    $actor = userWith(Permission::UsersUpdate, Permission::UsersSuspend, Permission::UsersDelete);
+    $actor->assignRole(privilegedRole());
+
+    expect($actor->can('update', $actor))->toBeTrue()
+        ->and($actor->can('suspend', $actor))->toBeFalse()
+        ->and($actor->can('delete', $actor))->toBeFalse();
+});
+
+it('still denies a privileged user without admin.assign updating another privileged user', function () {
+    $actor = userWith(Permission::UsersUpdate);
+    $actor->assignRole(privilegedRole());
+    $target = User::factory()->create();
+    $target->assignRole(privilegedRole());
+
+    expect($actor->can('update', $target))->toBeFalse();
 });

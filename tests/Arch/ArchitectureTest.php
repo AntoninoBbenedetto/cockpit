@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\LastRolesManagerGuard;
+use App\Actions\PrivilegedAccessGuard;
 use App\Models\User;
 
 // Presentation layer isolato: Filament non contiene logica di dominio.
@@ -24,7 +25,7 @@ arch('models do not depend on filament except the panel user')
 arch('actions expose handle()')
     ->expect('App\Actions')
     ->toHaveMethod('handle')
-    ->ignoring(LastRolesManagerGuard::class);
+    ->ignoring([LastRolesManagerGuard::class, PrivilegedAccessGuard::class]);
 
 arch('actions do not depend on the http layer')
     ->expect('App\Actions')

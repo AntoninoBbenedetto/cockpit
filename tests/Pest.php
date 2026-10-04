@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\Permission;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Permission as PermissionModel;
@@ -21,4 +22,12 @@ function userWith(Permission ...$permissions): User
     }
 
     return $user;
+}
+
+function privilegedRole(string $name = 'Gestori', Permission $permission = Permission::RolesManage): Role
+{
+    $role = Role::findOrCreate($name, 'web');
+    $role->givePermissionTo(PermissionModel::findOrCreate($permission->value, 'web'));
+
+    return $role;
 }

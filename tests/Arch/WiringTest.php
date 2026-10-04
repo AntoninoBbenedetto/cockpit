@@ -1,6 +1,12 @@
 <?php
 
+use App\Actions\DeleteRole;
+use App\Actions\DeleteUser;
+use App\Actions\SuspendUser;
+use App\Actions\SyncUserRoles;
+use App\Actions\UpdateRolePermissions;
 use App\Enums\Permission;
+use App\Models\User;
 use Illuminate\Support\Facades\Gate;
 use Symfony\Component\Finder\Finder;
 
@@ -35,3 +41,26 @@ it('names permissions as resource.action and keeps them unique', function () {
         expect($value)->toMatch('/^[a-z_]+(\.[a-z_]+)+$/');
     }
 });
+
+it('passes the acting user as first argument of sensitive actions', function (string $action) {
+    $first = (new ReflectionMethod($action, 'handle'))->getParameters()[0];
+
+    expect($first->getName())->toBe('actor')
+        ->and((string) $first->getType())->toBe(User::class);
+})->with([
+    SyncUserRoles::class,
+    UpdateRolePermissions::class,
+    DeleteRole::class,
+    SuspendUser::class,
+    DeleteUser::class,
+]);
+
+it('routes role and permission mutations through PrivilegedAccessGuard', function (string $action) {
+    $source = file_get_contents((new ReflectionClass($action))->getFileName());
+
+    expect($source)->toContain('PrivilegedAccessGuard::');
+})->with([
+    SyncUserRoles::class,
+    UpdateRolePermissions::class,
+    DeleteRole::class,
+]);

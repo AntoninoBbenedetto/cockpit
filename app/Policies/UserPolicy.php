@@ -43,13 +43,27 @@ class UserPolicy
     }
 
     /**
-     * Nessun privilege-up: chi non gestisce i ruoli (amministratore per
-     * design) può agire solo su chi ha permessi già in suo possesso.
+     * Nessun privilege-up: admin.assign (amministrazione completa) agisce su
+     * chiunque; chi non lo ha non tocca mai un altro utente con un ruolo
+     * privilegiato e, per gli altri, solo chi ha permessi già in suo possesso
+     * (ADR-004). Su sé stessi la modifica è sempre ammessa (sospensione ed
+     * eliminazione di sé stessi sono vietate a parte).
      */
     private function outranks(User $actor, User $target): bool
     {
-        if ($actor->can(Permission::RolesManage->value)) {
+        if ($actor->can(Permission::AdminAssign->value)) {
             return true;
+        }
+
+        // Modificare sé stessi è sicuro: i ruoli passano comunque da
+        // SyncUserRoles/PrivilegedAccessGuard, e sospendere o eliminare sé
+        // stessi è già vietato da suspend() e delete().
+        if ($actor->is($target)) {
+            return true;
+        }
+
+        if ($target->hasPrivilegedRole()) {
+            return false;
         }
 
         $held = $actor->getAllPermissions()->pluck('name');

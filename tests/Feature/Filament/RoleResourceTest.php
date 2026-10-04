@@ -51,6 +51,7 @@ it('updates the permissions of a role through the domain action', function () {
 it('keeps the permissions when it would remove roles.manage from the last manager', function () {
     $role = Role::findOrCreate('Gestori', 'web');
     $role->givePermissionTo(PermissionModel::findOrCreate(Permission::RolesManage->value, 'web'));
+    $role->givePermissionTo(PermissionModel::findOrCreate(Permission::AdminAssign->value, 'web'));
     $manager = User::factory()->create();
     $manager->assignRole($role);
 
@@ -102,6 +103,7 @@ it('deletes a role through the table action', function () {
 it('shows a notification and keeps the role when deleting it would remove the last manager', function () {
     $role = Role::findOrCreate('Gestori', 'web');
     $role->givePermissionTo(PermissionModel::findOrCreate(Permission::RolesManage->value, 'web'));
+    $role->givePermissionTo(PermissionModel::findOrCreate(Permission::AdminAssign->value, 'web'));
     $manager = User::factory()->create();
     $manager->assignRole($role);
 
@@ -160,4 +162,53 @@ it('does not expose bulk delete', function () {
     $this->actingAs(userWith(Permission::RolesManage));
 
     expect(livewire(ListRoles::class)->instance()->getTable()->getBulkActions())->toBeEmpty();
+});
+
+it('shows a notification and keeps a privileged role when an actor without admin.assign saves it', function (array $permissions) {
+    $role = privilegedRole();
+    $this->actingAs(userWith(Permission::RolesManage));
+
+    livewire(EditRole::class, ['record' => $role->getKey()])
+        ->fillForm(['name' => 'Rinominato', 'permission_names' => $permissions])
+        ->call('save')
+        ->assertNotified();
+
+    expect($role->fresh()->name)->toBe('Gestori')
+        ->and($role->fresh()->permissions->pluck('name')->all())->toBe([Permission::RolesManage->value]);
+})->with([
+    'no-op' => [[Permission::RolesManage->value]],
+    'add permission' => [[Permission::RolesManage->value, Permission::UsersView->value]],
+]);
+
+it('does not create a role with privileged permissions without admin.assign', function () {
+    $this->actingAs(userWith(Permission::RolesManage));
+
+    livewire(CreateRole::class)
+        ->fillForm(['name' => 'Furbo', 'permission_names' => [Permission::RolesManage->value]])
+        ->call('create')
+        ->assertNotified();
+
+    expect(Role::where('name', 'Furbo')->exists())->toBeFalse();
+});
+
+it('creates a role with privileged permissions with admin.assign', function () {
+    $this->actingAs(userWith(Permission::RolesManage, Permission::AdminAssign));
+
+    livewire(CreateRole::class)
+        ->fillForm(['name' => 'Gestori 2', 'permission_names' => [Permission::RolesManage->value]])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    expect(Role::findByName('Gestori 2', 'web')->isPrivileged())->toBeTrue();
+});
+
+it('shows a notification and keeps a privileged role when deleting it without admin.assign', function () {
+    $role = privilegedRole();
+    $this->actingAs(userWith(Permission::RolesManage));
+
+    livewire(ListRoles::class)
+        ->callAction(TestAction::make('delete')->table($role))
+        ->assertNotified();
+
+    expect(Role::where('name', 'Gestori')->exists())->toBeTrue();
 });

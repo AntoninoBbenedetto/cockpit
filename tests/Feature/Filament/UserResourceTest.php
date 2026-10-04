@@ -251,7 +251,7 @@ it('creates a user with roles and a password of at least 12 characters', functio
 
 it('shows a notification and keeps the roles when it would remove the last roles manager', function () {
     $role = Role::findOrCreate('Gestori', 'web');
-    foreach ([Permission::RolesManage, Permission::UsersView, Permission::UsersUpdate] as $permission) {
+    foreach ([Permission::RolesManage, Permission::AdminAssign, Permission::UsersView, Permission::UsersUpdate] as $permission) {
         $role->givePermissionTo(PermissionModel::findOrCreate($permission->value, 'web'));
     }
     $manager = User::factory()->create();
@@ -451,4 +451,35 @@ it('hides and denies suspend, reactivate and delete on a target the actor does n
         ->and($suspended->fresh()->status)->toBe(UserStatus::Suspended)
         ->and(User::find($active->id))->not->toBeNull()
         ->and(User::find($suspended->id))->not->toBeNull();
+});
+
+it('does not assign a privileged role from the edit form without admin.assign', function () {
+    $role = privilegedRole();
+    $this->actingAs(userWith(Permission::UsersView, Permission::UsersUpdate, Permission::RolesManage));
+    $target = User::factory()->create(['name' => 'Originale']);
+
+    livewire(EditUser::class, ['record' => $target->getKey()])
+        ->fillForm(['name' => 'Cambiato', 'role_names' => [$role->name]])
+        ->call('save')
+        ->assertNotified();
+
+    expect($target->fresh()->roles)->toHaveCount(0)
+        ->and($target->fresh()->name)->toBe('Originale');
+});
+
+it('does not create a user with a privileged role without admin.assign', function () {
+    $role = privilegedRole();
+    $this->actingAs(userWith(Permission::UsersView, Permission::UsersCreate, Permission::RolesManage));
+
+    livewire(CreateUser::class)
+        ->fillForm([
+            'name' => 'Nuovo',
+            'email' => 'nuovo@example.test',
+            'password' => 'una-password-lunga-12',
+            'role_names' => [$role->name],
+        ])
+        ->call('create')
+        ->assertNotified();
+
+    expect(User::where('email', 'nuovo@example.test')->exists())->toBeFalse();
 });
