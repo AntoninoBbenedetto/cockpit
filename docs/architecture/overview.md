@@ -20,7 +20,9 @@ voci di audit arrivano sia dalle azioni sia dagli eventi dei modelli
   assegnabile in massa: cambia solo tramite le azioni `SuspendUser` e
   `ReactivateUser`. Non ci sono azioni di eliminazione in blocco.
 - **Ruoli** (`/admin/roles`) — creazione, modifica dei permessi ed
-  eliminazione di ruoli. Tutte le pagine richiedono `roles.manage`.
+  eliminazione di ruoli. Tutte le pagine richiedono `roles.manage`; toccare un
+  ruolo privilegiato (o dargli/togliergli `roles.manage`/`admin.assign`)
+  richiede anche `admin.assign`.
 - **Impostazioni** (pagina `ManageGeneral`) — impostazioni generali tipizzate
   (`App\Settings\GeneralSettings`: `app_name`, `support_email`), con
   validazione nel form. Richiede `settings.general.update`.
@@ -29,13 +31,15 @@ voci di audit arrivano sia dalle azioni sia dagli eventi dei modelli
   eliminazione dal pannello.
 - **Azioni di dominio** (`app/Actions`): `SuspendUser`, `ReactivateUser`,
   `DeleteUser`, `SyncUserRoles(actor, target, ruoli)`,
-  `UpdateRolePermissions`, `DeleteRole`, e `LastRolesManagerGuard`, la guardia
+  `UpdateRolePermissions`, `DeleteRole` (tutte con l'actor come primo
+  argomento), `PrivilegedAccessGuard` (regola `admin.assign`, vedi sotto), e
+  `LastRolesManagerGuard`, la guardia
   anti-lockout: in una transazione (con lock advisory PostgreSQL) blocca solo
   il passaggio da 1 a 0 degli utenti attivi con `roles.manage`, e annulla la
   modifica con `LockoutException`. In più, non si può sospendere né eliminare
   sé stessi (policy e azioni).
 - **Permessi** — enum `App\Enums\Permission` (`users.view`, `users.create`,
-  `users.update`, `users.suspend`, `users.delete`, `roles.manage`,
+  `users.update`, `users.suspend`, `users.delete`, `roles.manage`, `admin.assign`,
   `settings.general.update`, `audit.view`), policy in `app/Policies`, seeder
   `RolesAndPermissionsSeeder` che crea i permessi e il ruolo `Amministratore`.
   Il codice verifica sempre permessi (`can()`), mai nomi di ruolo (vedi
@@ -53,7 +57,9 @@ voci di audit arrivano sia dalle azioni sia dagli eventi dei modelli
 2. Il campo dei ruoli è visibile solo se l'actor ha `roles.manage`. Senza,
    l'utente viene creato senza ruoli e il campo non può essere forzato:
    `SyncUserRoles` rifiuta con `AuthorizationException` un actor privo di
-   `roles.manage`.
+   `roles.manage`. I ruoli privilegiati restano selezionabili: se l'actor non
+   ha `admin.assign` l'azione rifiuta, la pagina mostra una notifica di
+   errore e non crea l'utente (controllo in `beforeCreate`).
 3. La password è obbligatoria (minimo 12 caratteri) e salvata come hash.
 4. La creazione registra una voce di audit sul modello; se i ruoli sono
    stati assegnati, `SyncUserRoles` registra anche `roles.synced` con valori
@@ -90,21 +96,27 @@ Ambiente: `make up` avvia i servizi `app` (PHP-FPM), `web` (Nginx), `db` e
 
 ## Modello di sicurezza e limiti noti
 
-- **`roles.manage` equivale, di fatto, ad amministrazione completa — per
-  scelta.** Chi lo possiede può assegnare qualsiasi permesso a qualsiasi
-  ruolo. È protetto dalla guardia anti-lockout, che impedisce di restare
-  senza utenti attivi con questo permesso, ma non limita ciò che un suo
-  titolare può concedere.
-- **Assegnare ruoli richiede `roles.manage`.** Si riusa questo permesso
-  invece di crearne uno dedicato; il controllo è applicato nell'azione
-  `SyncUserRoles`, non solo nel form.
+- **Due livelli di privilegio ([ADR-004](../adr/ADR-004-admin-assign-e-ruoli-privilegiati.md)).**
+  `roles.manage` da solo gestisce i ruoli ordinari. Un *ruolo privilegiato*
+  (contiene `roles.manage` o `admin.assign`, `Role::isPrivileged()`) può
+  essere assegnato, revocato, modificato nei permessi o eliminato solo da chi
+  ha anche `admin.assign`; l'amministrazione completa è la coppia
+  `roles.manage` + `admin.assign`. Chi ha `roles.manage` può comunque
+  assegnare qualsiasi permesso non privilegiato a un ruolo ordinario.
+  `roles.manage` resta protetto dalla guardia anti-lockout.
+- **La regola è nelle Action, non nei form.** `PrivilegedAccessGuard` è
+  chiamata da `SyncUserRoles`, `UpdateRolePermissions` e `DeleteRole` dentro
+  `LastRolesManagerGuard::protect`; il rifiuto è una `AuthorizationException`
+  senza modifiche né voci di audit. Le opzioni privilegiate nei form non
+  sono disabilitate: il rifiuto arriva come notifica dopo il tentativo.
 - **Nessun privilege-up su utenti.** `users.update`, `users.suspend` (anche
-  per riattivare) e `users.delete` valgono solo su un utente i cui permessi
-  (diretti e da ruoli) sono un sottoinsieme di quelli dell'actor, oppure se
-  l'actor ha `roles.manage`. Un utente non può quindi gestire (né cambiarne
-  email e password) chi ha permessi che lui non possiede. La pagina di
-  modifica ri-autorizza `update` anche al salvataggio. Il cambio password
-  resta registrato come `password.changed`, senza alcun valore.
+  per riattivare) e `users.delete` (`UserPolicy::outranks`) valgono su un
+  utente se l'actor ha `admin.assign`; altrimenti un utente con un ruolo
+  privilegiato (`User::hasPrivilegedRole()`) è sempre negato, e gli altri
+  solo se i loro permessi (diretti e da ruoli) sono un sottoinsieme di quelli
+  dell'actor. La pagina di modifica ri-autorizza `update` anche al
+  salvataggio. Il cambio password resta registrato come `password.changed`,
+  senza alcun valore.
 - **Retention dell'audit log non definita**: le voci non vengono mai
   cancellate né archiviate; la politica è fuori scopo per ora.
 - **Il seeder non tocca un `Amministratore` esistente**: assegna tutti i
@@ -122,5 +134,9 @@ Ambiente: `make up` avvia i servizi `app` (PHP-FPM), `web` (Nginx), `db` e
   - le modifiche ai permessi fatte dal seeder non sono registrate;
   - la guardia anti-lockout non copre i permessi assegnati direttamente a un
     utente (nessun percorso di interfaccia lo consente oggi);
+  - la migrazione `grant_admin_assign_to_roles_managers` non scrive audit;
+  - i permessi diretti (`roles.manage`/`admin.assign` dati senza ruolo) non
+    rendono privilegiato un utente né ricevono `admin.assign` dalla
+    migrazione;
   - un utente sospeso mantiene i permessi Spatie: l'accesso è negato dal
     controllo di accesso al pannello, non dalla rimozione dei permessi.

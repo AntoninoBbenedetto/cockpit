@@ -36,7 +36,8 @@ make lint      # pint --test + phpstan (non scrive)
 
 - **Solo permessi, mai ruoli**: usare `$user->can(Permission::X->value)`. Mai `hasRole()`, mai `Gate::before`, nessun super-admin con bypass (ADR-002).
 - **Mutazioni sensibili** (ruoli, permessi, sospensione, eliminazione) vivono in `app/Actions` e vanno dentro `LastRolesManagerGuard::protect(Closure)` (anti-lockout con advisory lock Postgres): la voce di audit si scrive nella stessa transazione. Il blocco scatta solo sul passaggio da 1 a 0 utenti attivi con `roles.manage`.
-- **Privilege-up**: `UserPolicy::outranks` — update/suspend/delete su un utente solo se i suoi permessi sono un sottoinsieme di quelli dell'actor, oppure l'actor ha `roles.manage`. Suspend/delete su sé stessi vietati. Assegnare ruoli richiede `roles.manage`, verificato in `SyncUserRoles`, non solo nel form. `roles.manage` equivale di fatto ad amministrazione completa (scelta dichiarata).
+- **Privilege-up**: `UserPolicy::outranks` — update/suspend/delete su un utente solo se i suoi permessi sono un sottoinsieme di quelli dell'actor, oppure l'actor ha `admin.assign`. Suspend/delete su sé stessi vietati. Assegnare ruoli richiede `roles.manage`, verificato in `SyncUserRoles`, non solo nel form. `admin.assign` (insieme a `roles.manage`) equivale ad amministrazione completa (ADR-004).
+- **Ruoli privilegiati** (contengono `roles.manage` o `admin.assign`, `Role::isPrivileged()`): assegnarli/revocarli, modificarne i permessi, eliminarli o agire sugli utenti che li hanno richiede `admin.assign`. La regola è in `PrivilegedAccessGuard`, chiamata dalle Action dentro `LastRolesManagerGuard::protect`; le Action sensibili (`SyncUserRoles`, `UpdateRolePermissions`, `DeleteRole`, `SuspendUser`, `DeleteUser`) prendono `User $actor` come primo argomento (ADR-004).
 - **Audit log**: `logOnly` esplicito, mai `logAll`; password e `remember_token` mai nei log. Log name `rbac` (`roles.synced`, `permissions.synced`, `role.deleted`) e `settings`. Nessuna voce se l'insieme non cambia. Le voci non sono modificabili/eliminabili (policy).
 - **Nuova risorsa o permesso**: caso in `Permission` → policy scritta a mano → registrazione in `AppServiceProvider` → test di policy. `UpdateRolePermissions` rifiuta nomi non presenti nell'enum.
 - **Seeder idempotente**: `RolesAndPermissionsSeeder` assegna tutti i permessi ad `Amministratore` solo quando crea il ruolo; non riallinea se esiste già.
@@ -47,7 +48,7 @@ make lint      # pint --test + phpstan (non scrive)
 ## Test
 
 - Pest 5 + plugin Livewire: nei test Filament usare `livewire(...)`. Helper globale `userWith(Permission ...$permissions)` in `tests/Pest.php`. `RefreshDatabase` su tutta `tests/Feature`.
-- `tests/Arch`: regole architetturali (Pest arch + scansione sorgenti + cablaggio policy/permessi), girano con `make test`. Una nuova regola da non violare va codificata lì.
+- `tests/Arch`: regole architetturali (Pest arch + scansione sorgenti + cablaggio policy/permessi), girano con `make test`. Una nuova regola da non violare va codificata lì. Tra queste, `tests/Arch/WiringTest.php` impone che le Action sensibili prendano `User $actor` come primo argomento.
 - I test girano solo nel container (PostgreSQL host `db`, database `cockpit_test`). Il DB di test lo crea `docker/postgres/init-test-db.sh` solo alla prima inizializzazione del volume `db-data`: se manca va creato a mano.
 
 ## Convenzioni
@@ -65,4 +66,4 @@ make lint      # pint --test + phpstan (non scrive)
 
 ## Limiti noti
 
-Modifica utente non atomica con la sync dei ruoli; un ruolo eliminato viene loggato due volte (evento del modello + `role.deleted`); le modifiche ai permessi fatte dal seeder non sono loggate; i permessi assegnati direttamente a un utente non sono coperti dall'anti-lockout.
+Modifica utente non atomica con la sync dei ruoli; un ruolo eliminato viene loggato due volte (evento del modello + `role.deleted`); le modifiche ai permessi fatte dal seeder non sono loggate; i permessi assegnati direttamente a un utente non sono coperti dall'anti-lockout; la migrazione `grant_admin_assign_to_roles_managers` non scrive audit; i permessi diretti (`roles.manage`/`admin.assign` dati senza ruolo) non rendono privilegiato un utente né ricevono `admin.assign` dalla migrazione; i form Filament non disabilitano le opzioni privilegiate (il rifiuto è una notifica dopo il tentativo).

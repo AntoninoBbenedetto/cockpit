@@ -1,7 +1,7 @@
 # Permesso `admin.assign` e ruoli privilegiati — design
 
 Data: 2026-10-04
-Stato: bozza in revisione
+Stato: implementata (vedi ADR-004)
 
 ## Obiettivo
 
@@ -55,8 +55,8 @@ Anche la creazione di un ruolo con permessi privilegiati passa dallo stesso cont
 
 ## UI
 
-- Form utente: i ruoli privilegiati sono disabilitati o nascosti se l'actor non ha `admin.assign`. È solo un aiuto: l'applicazione della regola resta nell'Action.
-- `RoleForm`: stesso trattamento per le checkbox `roles.manage` e `admin.assign`.
+- Form utente e `RoleForm`: le opzioni privilegiate (ruoli privilegiati, checkbox `roles.manage` e `admin.assign`) restano selezionabili. L'Action lancia `AuthorizationException`; le pagine la intercettano, mostrano una notifica di errore e chiamano `halt()`. `CreateRole` e `CreateUser` controllano in `beforeCreate`, così non resta nessun record orfano.
+- Nota (drift corretto: la spec segue il codice): inizialmente era previsto di disabilitare o nascondere le opzioni, ma in Filament 5 `disableOptionWhen` le toglie dalla regola di validazione `in`, quindi il form fallirebbe con un errore generico prima che la pagina possa intercettare il rifiuto.
 - Modifica, sospensione ed eliminazione utente seguono `outranks` tramite policy, senza lavoro aggiuntivo.
 
 ## Audit
