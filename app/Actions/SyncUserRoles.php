@@ -16,12 +16,13 @@ class SyncUserRoles
         }
 
         $before = $target->roles()->pluck('name')->sort()->values()->all();
+        $after = collect($roleNames)->sort()->values()->all();
 
         // Modifica e voce di audit nella stessa transazione: o entrambe o nessuna.
-        LastRolesManagerGuard::protect(function () use ($actor, $target, $roleNames, $before) {
-            $target->syncRoles($roleNames);
+        LastRolesManagerGuard::protect(function () use ($actor, $target, $roleNames, $before, $after) {
+            PrivilegedAccessGuard::ensureCanChangeRoles($actor, $before, $after);
 
-            $after = collect($roleNames)->sort()->values()->all();
+            $target->syncRoles($roleNames);
 
             if ($after === $before) {
                 return;

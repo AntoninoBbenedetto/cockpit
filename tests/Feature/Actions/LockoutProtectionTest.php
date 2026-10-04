@@ -20,6 +20,7 @@ function lastManagerSetup(): array
 {
     $role = Role::findOrCreate('Gestori', 'web');
     $role->givePermissionTo(PermissionModel::findOrCreate(Permission::RolesManage->value, 'web'));
+    $role->givePermissionTo(PermissionModel::findOrCreate(Permission::AdminAssign->value, 'web'));
 
     $manager = User::factory()->create();
     $manager->assignRole($role);

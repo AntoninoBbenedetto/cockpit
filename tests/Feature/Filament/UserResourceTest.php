@@ -251,7 +251,7 @@ it('creates a user with roles and a password of at least 12 characters', functio
 
 it('shows a notification and keeps the roles when it would remove the last roles manager', function () {
     $role = Role::findOrCreate('Gestori', 'web');
-    foreach ([Permission::RolesManage, Permission::UsersView, Permission::UsersUpdate] as $permission) {
+    foreach ([Permission::RolesManage, Permission::AdminAssign, Permission::UsersView, Permission::UsersUpdate] as $permission) {
         $role->givePermissionTo(PermissionModel::findOrCreate($permission->value, 'web'));
     }
     $manager = User::factory()->create();

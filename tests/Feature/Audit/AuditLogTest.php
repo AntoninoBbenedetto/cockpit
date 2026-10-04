@@ -190,6 +190,7 @@ it('logs permission changes and role deletion with the causer', function () {
 it('writes no rbac entries when the lockout guard rolls the change back', function () {
     $role = Role::findOrCreate('Gestori', 'web');
     $role->givePermissionTo(Spatie\Permission\Models\Permission::findOrCreate(Permission::RolesManage->value, 'web'));
+    $role->givePermissionTo(Spatie\Permission\Models\Permission::findOrCreate(Permission::AdminAssign->value, 'web'));
     $manager = User::factory()->create();
     $manager->assignRole($role);
     Activity::query()->delete();

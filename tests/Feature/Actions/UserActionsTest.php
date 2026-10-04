@@ -10,6 +10,7 @@ use App\Enums\UserStatus;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
+use Spatie\Activitylog\Models\Activity;
 
 it('suspends and reactivates a user', function () {
     $actor = userWith(Permission::UsersSuspend);
@@ -66,4 +67,61 @@ it('refuses to sync roles for an actor without roles.manage and changes nothing'
         ->toThrow(AuthorizationException::class);
 
     expect($target->fresh()->roles)->toHaveCount(0);
+});
+
+it('refuses to assign a privileged role without admin.assign and changes nothing', function () {
+    $role = privilegedRole();
+    $actor = userWith(Permission::RolesManage);
+    $target = User::factory()->create();
+
+    expect(fn () => app(SyncUserRoles::class)->handle($actor, $target, [$role->name]))
+        ->toThrow(AuthorizationException::class);
+
+    expect($target->fresh()->roles)->toHaveCount(0)
+        ->and(Activity::where('event', 'roles.synced')->count())->toBe(0);
+});
+
+it('assigns a privileged role with admin.assign', function () {
+    $role = privilegedRole();
+    $actor = userWith(Permission::RolesManage, Permission::AdminAssign);
+    $target = User::factory()->create();
+
+    app(SyncUserRoles::class)->handle($actor, $target, [$role->name]);
+
+    expect($target->fresh()->roles->pluck('name')->all())->toBe([$role->name]);
+});
+
+it('refuses to revoke a privileged role without admin.assign', function () {
+    $role = privilegedRole();
+    $target = User::factory()->create();
+    $target->assignRole($role);
+    userWith(Permission::RolesManage);
+    $actor = userWith(Permission::RolesManage);
+
+    expect(fn () => app(SyncUserRoles::class)->handle($actor, $target, []))
+        ->toThrow(AuthorizationException::class);
+
+    expect($target->fresh()->roles->pluck('name')->all())->toBe([$role->name]);
+});
+
+it('lets roles.manage alone change ordinary roles on a user who keeps a privileged role', function () {
+    $privileged = privilegedRole();
+    Role::findOrCreate('Operatore', 'web');
+    $target = User::factory()->create();
+    $target->assignRole($privileged);
+    $actor = userWith(Permission::RolesManage);
+
+    app(SyncUserRoles::class)->handle($actor, $target, [$privileged->name, 'Operatore']);
+
+    expect($target->fresh()->roles->pluck('name')->sort()->values()->all())->toBe(['Gestori', 'Operatore']);
+});
+
+it('refuses self-demotion from a privileged role without admin.assign', function () {
+    $actor = User::factory()->create();
+    $actor->assignRole(privilegedRole());
+
+    expect(fn () => app(SyncUserRoles::class)->handle($actor, $actor, []))
+        ->toThrow(AuthorizationException::class);
+
+    expect($actor->fresh()->roles)->toHaveCount(1);
 });
