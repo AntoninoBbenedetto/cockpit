@@ -456,14 +456,15 @@ it('hides and denies suspend, reactivate and delete on a target the actor does n
 it('does not assign a privileged role from the edit form without admin.assign', function () {
     $role = privilegedRole();
     $this->actingAs(userWith(Permission::UsersView, Permission::UsersUpdate, Permission::RolesManage));
-    $target = User::factory()->create();
+    $target = User::factory()->create(['name' => 'Originale']);
 
     livewire(EditUser::class, ['record' => $target->getKey()])
-        ->fillForm(['role_names' => [$role->name]])
+        ->fillForm(['name' => 'Cambiato', 'role_names' => [$role->name]])
         ->call('save')
         ->assertNotified();
 
-    expect($target->fresh()->roles)->toHaveCount(0);
+    expect($target->fresh()->roles)->toHaveCount(0)
+        ->and($target->fresh()->name)->toBe('Originale');
 });
 
 it('does not create a user with a privileged role without admin.assign', function () {

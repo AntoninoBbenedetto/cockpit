@@ -54,3 +54,13 @@ it('passes the acting user as first argument of sensitive actions', function (st
     SuspendUser::class,
     DeleteUser::class,
 ]);
+
+it('routes role and permission mutations through PrivilegedAccessGuard', function (string $action) {
+    $source = file_get_contents((new ReflectionClass($action))->getFileName());
+
+    expect($source)->toContain('PrivilegedAccessGuard::');
+})->with([
+    SyncUserRoles::class,
+    UpdateRolePermissions::class,
+    DeleteRole::class,
+]);
