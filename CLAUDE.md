@@ -2,7 +2,7 @@
 
 Cockpit: admin panel Laravel 13 + Filament 5 (utenti, ruoli/permessi, impostazioni, audit log). Progetto portfolio pensato per essere letto oltre che eseguito.
 
-Stack: PHP 8.4 (solo in Docker), Laravel 13, Filament 5 / Livewire 4, PostgreSQL 18, spatie/laravel-permission, activitylog e settings, Pest 5, Larastan (livello 5, solo `app/`), Pint. Niente Node/Vite, niente API REST, niente CI.
+Stack: PHP 8.4 (solo in Docker), Laravel 13, Filament 5 / Livewire 4, PostgreSQL 18, spatie/laravel-permission, activitylog e settings, Pest 5, Larastan (livello 5, solo `app/`), Pint. Niente Node/Vite, niente API REST. CI: GitHub Actions (`.github/workflows/ci.yml`) lancia Pint, Larastan e Pest su PR verso `main` e push su `main`, con gli stessi comandi del Makefile ma su runner nativo (non Docker): tenere allineate le versioni di PHP e Postgres a `docker/php/Dockerfile` e `compose.yaml`.
 
 ## Comandi
 
