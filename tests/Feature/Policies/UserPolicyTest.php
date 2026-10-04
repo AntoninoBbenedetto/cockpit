@@ -126,3 +126,21 @@ it('no longer lets roles.manage alone bypass the permission subset rule', functi
 
     expect($actor->can('update', $target))->toBeFalse();
 });
+
+it('lets a privileged user without admin.assign update themselves but not suspend or delete themselves', function () {
+    $actor = userWith(Permission::UsersUpdate, Permission::UsersSuspend, Permission::UsersDelete);
+    $actor->assignRole(privilegedRole());
+
+    expect($actor->can('update', $actor))->toBeTrue()
+        ->and($actor->can('suspend', $actor))->toBeFalse()
+        ->and($actor->can('delete', $actor))->toBeFalse();
+});
+
+it('still denies a privileged user without admin.assign updating another privileged user', function () {
+    $actor = userWith(Permission::UsersUpdate);
+    $actor->assignRole(privilegedRole());
+    $target = User::factory()->create();
+    $target->assignRole(privilegedRole());
+
+    expect($actor->can('update', $target))->toBeFalse();
+});
