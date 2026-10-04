@@ -6,6 +6,7 @@ use App\Actions\UpdateRolePermissions;
 use App\Exceptions\LockoutException;
 use App\Filament\Resources\Roles\RoleResource;
 use App\Models\Role;
+use App\Models\User;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 
@@ -29,8 +30,11 @@ class CreateRole extends CreateRecord
         /** @var Role $role */
         $role = $this->getRecord();
 
+        /** @var User $actor */
+        $actor = auth()->user();
+
         try {
-            app(UpdateRolePermissions::class)->handle($role, $this->data['permission_names'] ?? []);
+            app(UpdateRolePermissions::class)->handle($actor, $role, $this->data['permission_names'] ?? []);
         } catch (LockoutException $e) {
             Notification::make()->danger()->title($e->getMessage())->send();
         }

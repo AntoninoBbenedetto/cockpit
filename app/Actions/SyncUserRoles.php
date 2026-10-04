@@ -15,11 +15,12 @@ class SyncUserRoles
             throw new AuthorizationException('Non hai il permesso di assegnare ruoli.');
         }
 
-        $before = $target->roles()->pluck('name')->sort()->values()->all();
         $after = collect($roleNames)->sort()->values()->all();
 
         // Modifica e voce di audit nella stessa transazione: o entrambe o nessuna.
-        LastRolesManagerGuard::protect(function () use ($actor, $target, $roleNames, $before, $after) {
+        LastRolesManagerGuard::protect(function () use ($actor, $target, $roleNames, $after) {
+            // Lo stato precedente si legge dopo il lock, così una modifica concorrente non va persa.
+            $before = $target->roles()->pluck('name')->sort()->values()->all();
             PrivilegedAccessGuard::ensureCanChangeRoles($actor, $before, $after);
 
             $target->syncRoles($roleNames);

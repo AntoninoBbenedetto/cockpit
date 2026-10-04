@@ -101,12 +101,13 @@ it('writes no roles.synced when the role set is unchanged', function () {
 
 it('writes no permissions.synced when the permissions are unchanged', function () {
     $role = Role::findOrCreate('Operatore', 'web');
+    $actor = User::factory()->create();
 
-    app(UpdateRolePermissions::class)->handle($role, []);
+    app(UpdateRolePermissions::class)->handle($actor, $role, []);
     expect(Activity::where('event', 'permissions.synced')->count())->toBe(0);
 
-    app(UpdateRolePermissions::class)->handle($role, [Permission::UsersView->value]);
-    app(UpdateRolePermissions::class)->handle($role, [Permission::UsersView->value]);
+    app(UpdateRolePermissions::class)->handle($actor, $role, [Permission::UsersView->value]);
+    app(UpdateRolePermissions::class)->handle($actor, $role, [Permission::UsersView->value]);
 
     expect(Activity::where('event', 'permissions.synced')->count())->toBe(1);
 });
@@ -175,8 +176,8 @@ it('logs permission changes and role deletion with the causer', function () {
     $this->actingAs($actor);
     $role = Role::findOrCreate('Operatore', 'web');
 
-    app(UpdateRolePermissions::class)->handle($role, [Permission::UsersView->value]);
-    app(DeleteRole::class)->handle($role);
+    app(UpdateRolePermissions::class)->handle($actor, $role, [Permission::UsersView->value]);
+    app(DeleteRole::class)->handle($actor, $role);
 
     $perm = Activity::where('event', 'permissions.synced')->firstOrFail();
     $del = Activity::where('event', 'role.deleted')->firstOrFail();
@@ -193,10 +194,11 @@ it('writes no rbac entries when the lockout guard rolls the change back', functi
     $role->givePermissionTo(Spatie\Permission\Models\Permission::findOrCreate(Permission::AdminAssign->value, 'web'));
     $manager = User::factory()->create();
     $manager->assignRole($role);
+    $admin = userWith(Permission::AdminAssign);
     Activity::query()->delete();
 
-    expect(fn () => app(UpdateRolePermissions::class)->handle($role, []))->toThrow(LockoutException::class)
-        ->and(fn () => app(DeleteRole::class)->handle($role))->toThrow(LockoutException::class)
+    expect(fn () => app(UpdateRolePermissions::class)->handle($admin, $role, []))->toThrow(LockoutException::class)
+        ->and(fn () => app(DeleteRole::class)->handle($admin, $role))->toThrow(LockoutException::class)
         ->and(fn () => app(SyncUserRoles::class)->handle($manager, $manager, []))->toThrow(LockoutException::class);
 
     expect(Activity::count())->toBe(0);
@@ -214,10 +216,10 @@ it('rolls back the rbac change when its audit entry cannot be written', function
     expect(fn () => app(SyncUserRoles::class)->handle($actor, $target, []))->toThrow(RuntimeException::class)
         ->and($target->fresh()->hasRole('Operatore'))->toBeTrue();
 
-    expect(fn () => app(UpdateRolePermissions::class)->handle($role, []))->toThrow(RuntimeException::class)
+    expect(fn () => app(UpdateRolePermissions::class)->handle($actor, $role, []))->toThrow(RuntimeException::class)
         ->and($role->fresh()->hasPermissionTo(Permission::UsersView->value))->toBeTrue();
 
-    expect(fn () => app(DeleteRole::class)->handle($role))->toThrow(RuntimeException::class)
+    expect(fn () => app(DeleteRole::class)->handle($actor, $role))->toThrow(RuntimeException::class)
         ->and(Role::where('name', 'Operatore')->exists())->toBeTrue();
 });
 

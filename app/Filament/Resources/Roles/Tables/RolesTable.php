@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Roles\Tables;
 use App\Actions\DeleteRole;
 use App\Exceptions\LockoutException;
 use App\Models\Role;
+use App\Models\User;
 use DomainException;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
@@ -35,8 +36,11 @@ class RolesTable
                     ->requiresConfirmation()
                     ->authorize('delete')
                     ->action(function (Role $record) {
+                        /** @var User $actor */
+                        $actor = auth()->user();
+
                         try {
-                            app(DeleteRole::class)->handle($record);
+                            app(DeleteRole::class)->handle($actor, $record);
                         } catch (DomainException|LockoutException $e) {
                             Notification::make()->danger()->title($e->getMessage())->send();
 

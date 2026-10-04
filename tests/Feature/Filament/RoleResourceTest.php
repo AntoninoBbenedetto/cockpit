@@ -51,6 +51,7 @@ it('updates the permissions of a role through the domain action', function () {
 it('keeps the permissions when it would remove roles.manage from the last manager', function () {
     $role = Role::findOrCreate('Gestori', 'web');
     $role->givePermissionTo(PermissionModel::findOrCreate(Permission::RolesManage->value, 'web'));
+    $role->givePermissionTo(PermissionModel::findOrCreate(Permission::AdminAssign->value, 'web'));
     $manager = User::factory()->create();
     $manager->assignRole($role);
 
@@ -102,6 +103,7 @@ it('deletes a role through the table action', function () {
 it('shows a notification and keeps the role when deleting it would remove the last manager', function () {
     $role = Role::findOrCreate('Gestori', 'web');
     $role->givePermissionTo(PermissionModel::findOrCreate(Permission::RolesManage->value, 'web'));
+    $role->givePermissionTo(PermissionModel::findOrCreate(Permission::AdminAssign->value, 'web'));
     $manager = User::factory()->create();
     $manager->assignRole($role);
 

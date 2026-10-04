@@ -33,7 +33,7 @@ function lastManagerSetup(): array
 it('blocks removing roles.manage from the role of the last manager', function () {
     [$role, $manager] = lastManagerSetup();
 
-    expect(fn () => app(UpdateRolePermissions::class)->handle($role, []))
+    expect(fn () => app(UpdateRolePermissions::class)->handle(userWith(Permission::AdminAssign), $role, []))
         ->toThrow(LockoutException::class);
 
     expect($role->fresh()->hasPermissionTo(Permission::RolesManage->value))->toBeTrue();
@@ -43,7 +43,7 @@ it('blocks removing roles.manage from the role of the last manager', function ()
 it('blocks deleting the role of the last manager', function () {
     [$role, $manager] = lastManagerSetup();
 
-    expect(fn () => app(DeleteRole::class)->handle($role))->toThrow(LockoutException::class);
+    expect(fn () => app(DeleteRole::class)->handle(userWith(Permission::AdminAssign), $role))->toThrow(LockoutException::class);
 
     expect(Role::where('name', 'Gestori')->exists())->toBeTrue();
     expect($manager->fresh()->can(Permission::RolesManage->value))->toBeTrue();
@@ -105,7 +105,7 @@ it('allows deleting the role when another manager remains', function () {
     [$role] = lastManagerSetup();
     $other = userWith(Permission::RolesManage);
 
-    app(DeleteRole::class)->handle($role);
+    app(DeleteRole::class)->handle(userWith(Permission::AdminAssign), $role);
 
     expect(Role::where('name', 'Gestori')->exists())->toBeFalse()
         ->and($other->fresh()->can(Permission::RolesManage->value))->toBeTrue();
@@ -115,7 +115,7 @@ it('allows updating the role permissions when another manager remains', function
     [$role] = lastManagerSetup();
     userWith(Permission::RolesManage);
 
-    app(UpdateRolePermissions::class)->handle($role, []);
+    app(UpdateRolePermissions::class)->handle(userWith(Permission::AdminAssign), $role, []);
 
     expect($role->fresh()->permissions)->toHaveCount(0);
 });
